@@ -1,0 +1,4047 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الاستثمار</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Colors */
+            --primary-color: #7267EF;
+            --primary-light: #9D96F5;
+            --primary-dark: #5549DD;
+            --secondary-color: #1B1B38;
+            
+            --success-color: #2ECC71;
+            --danger-color: #e74c3c;
+            --warning-color: #ff9800;
+            --info-color: #00cec9;
+            
+            --bg-color: #f3f3fe;
+            --card-bg: #ffffff;
+            --text-color: #1A202C;
+            --text-muted: #717171;
+            --border-color: #e9e9ef;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+            
+            /* Border Radius */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            
+            /* Font Sizes */
+            --font-xs: 12px;
+            --font-sm: 14px;
+            --font-md: 16px;
+            --font-lg: 18px;
+            --font-xl: 24px;
+            --font-xxl: 32px;
+        }
+        
+        /* Dark Theme Variables */
+        .theme-dark {
+            --bg-color: #1A1A2E;
+            --card-bg: #16213E;
+            --text-color: #E9E9E9;
+            --text-muted: #9e9e9e;
+            --border-color: #2c3448;
+        }
+        
+        /* Font Sizes */
+        .font-small {
+            --font-xs: 11px;
+            --font-sm: 13px;
+            --font-md: 15px;
+            --font-lg: 17px;
+            --font-xl: 22px;
+            --font-xxl: 28px;
+        }
+        
+        .font-large {
+            --font-xs: 13px;
+            --font-sm: 15px;
+            --font-md: 17px;
+            --font-lg: 20px;
+            --font-xl: 26px;
+            --font-xxl: 36px;
+        }
+        
+        /* Global Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: var(--font-md);
+            line-height: 1.5;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        a {
+            text-decoration: none;
+            color: var(--primary-color);
+        }
+        
+        /* Layout */
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(135deg, var(--secondary-color), #2C2C54);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 10;
+            transition: transform 0.3s, width 0.3s;
+            box-shadow: var(--shadow-md);
+        }
+        
+        .sidebar.collapsed {
+            width: 70px;
+        }
+        
+        .sidebar.collapsed .menu-label,
+        .sidebar.collapsed .logo-text,
+        .sidebar.collapsed .menu-badge {
+            display: none;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .logo-icon {
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            border-radius: 10px;
+            margin-right: 15px;
+            font-size: 18px;
+        }
+        
+        .logo-text {
+            font-size: var(--font-lg);
+            font-weight: 700;
+        }
+        
+        .sidebar-toggle {
+            position: absolute;
+            left: 280px;
+            top: 20px;
+            width: 30px;
+            height: 30px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            transition: left 0.3s;
+            z-index: 11;
+        }
+        
+        .sidebar.collapsed + .sidebar-toggle {
+            left: 70px;
+        }
+        
+        .menu {
+            list-style: none;
+            padding: 0 15px;
+        }
+        
+        .menu-item {
+            margin: 5px 0;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+        
+        .menu-item a {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            color: rgba(255,255,255,0.7);
+            transition: all 0.3s;
+            position: relative;
+            font-weight: 500;
+        }
+        
+        .menu-item.active a,
+        .menu-item a:hover {
+            color: #fff;
+            background-color: rgba(255,255,255,0.08);
+        }
+        
+        .menu-item.active a {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        }
+        
+        .menu-icon {
+            width: 24px;
+            text-align: center;
+            margin-left: 10px;
+            font-size: 16px;
+        }
+        
+        .menu-badge {
+            position: absolute;
+            left: 15px;
+            background-color: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: var(--font-xs);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            margin-right: 280px;
+            transition: margin 0.3s;
+        }
+        
+        .sidebar.collapsed ~ .main-content {
+            margin-right: 70px;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .page-title {
+            font-size: var(--font-xl);
+            font-weight: 700;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+        }
+        
+        .page-title i {
+            margin-left: 15px;
+            font-size: 24px;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+        }
+        
+        .notification-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--card-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 15px;
+            cursor: pointer;
+            position: relative;
+            box-shadow: var(--shadow-sm);
+            color: var(--text-color);
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: var(--font-xs);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+        
+        .user-profile {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: var(--radius-md);
+            transition: background-color 0.3s;
+        }
+        
+        .user-profile:hover {
+            background-color: rgba(0,0,0,0.03);
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-left: 10px;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .user-role {
+            font-size: var(--font-xs);
+            color: var(--text-muted);
+        }
+        
+        /* Cards */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .card-gradient-border {
+            position: relative;
+            padding: 1px;
+            background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+            border-radius: var(--radius-lg);
+        }
+        
+        .card-gradient-border > div {
+            background-color: var(--card-bg);
+            border-radius: calc(var(--radius-lg) - 1px);
+        }
+        
+        .card-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .card-title {
+            font-weight: 700;
+            font-size: var(--font-lg);
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+        }
+        
+        .card-title i {
+            color: var(--primary-color);
+            margin-left: 10px;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .card-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        
+        /* Dashboard Stats */
+        .dashboard-stats {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -10px;
+        }
+        
+        .stat-card {
+            background-color: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin: 10px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+            font-size: 24px;
+            margin-left: 15px;
+        }
+        
+        .stat-details {
+            flex: 1;
+        }
+        
+        .stat-value {
+            font-size: var(--font-xl);
+            font-weight: 800;
+            color: var(--text-color);
+        }
+        
+        .stat-label {
+            color: var(--text-muted);
+            font-size: var(--font-sm);
+        }
+        
+        .stat-change {
+            font-size: var(--font-xs);
+            display: flex;
+            align-items: center;
+            margin-top: 5px;
+        }
+        
+        .stat-change.positive {
+            color: var(--success-color);
+        }
+        
+        .stat-change.negative {
+            color: var(--danger-color);
+        }
+        
+        .stat-change i {
+            margin-left: 5px;
+        }
+        
+        /* Charts */
+        .chart-container {
+            width: 100%;
+            height: 350px;
+            position: relative;
+        }
+        
+        .chart-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+        
+        .card-tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-muted);
+            position: relative;
+            transition: color 0.3s;
+        }
+        
+        .card-tab.active {
+            color: var(--primary-color);
+        }
+        
+        .card-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            right: 0;
+            left: 0;
+            height: 2px;
+            background-color: var(--primary-color);
+        }
+        
+        /* Table Styles */
+        .table-responsive {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: right;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        th {
+            font-weight: 700;
+            background-color: rgba(0,0,0,0.02);
+            color: var(--text-color);
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:hover td {
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .status-pill {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: var(--font-xs);
+            font-weight: 700;
+            text-align: center;
+        }
+        
+        .status-deposit {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: var(--success-color);
+        }
+        
+        .status-withdrawal {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: var(--danger-color);
+        }
+        
+        .status-profit {
+            background-color: rgba(255, 152, 0, 0.1);
+            color: var(--warning-color);
+        }
+        
+        .action-buttons {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 5px;
+        }
+        
+        .action-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-size: var(--font-sm);
+        }
+        
+        .view-btn {
+            color: var(--info-color);
+        }
+        
+        .edit-btn {
+            color: var(--warning-color);
+        }
+        
+        .delete-btn {
+            color: var(--danger-color);
+        }
+        
+        .action-btn:hover {
+            background-color: rgba(0,0,0,0.05);
+        }
+        
+        /* Search Box */
+        .search-box {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: var(--font-md);
+            font-family: 'Cairo', sans-serif;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(114, 103, 239, 0.1);
+        }
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            font-size: var(--font-sm);
+            font-family: 'Cairo', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            outline: none;
+        }
+        
+        .btn i {
+            margin-left: 8px;
+        }
+        
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: var(--font-xs);
+        }
+        
+        .btn-lg {
+            padding: 12px 25px;
+            font-size: var(--font-md);
+        }
+        
+        .btn-round {
+            border-radius: 50px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+            box-shadow: 0 5px 15px rgba(114, 103, 239, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color), #27ae60);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: linear-gradient(135deg, #27ae60, var(--success-color));
+            box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger-color), #c0392b);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #c0392b, var(--danger-color));
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning-color), #f57c00);
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: linear-gradient(135deg, #f57c00, var(--warning-color));
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+        }
+        
+        .btn-outline-primary {
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            background-color: transparent;
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: var(--font-md);
+            font-family: 'Cairo', sans-serif;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(114, 103, 239, 0.1);
+        }
+        
+        .form-control::placeholder {
+            color: var(--text-muted);
+        }
+        
+        textarea.form-control {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: left 15px center;
+            background-size: 15px;
+            padding-left: 40px;
+        }
+        
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -10px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+            padding: 0 10px;
+            min-width: 250px;
+        }
+        
+        .input-with-icon {
+            position: relative;
+        }
+        
+        .input-with-icon .form-control {
+            padding-right: 40px;
+        }
+        
+        .input-with-icon i {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+        
+        /* Calendar */
+        .calendar {
+            background-color: var(--card-bg);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+        
+        .calendar-header {
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+        }
+        
+        .calendar-title {
+            font-size: var(--font-lg);
+            font-weight: 700;
+        }
+        
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .calendar-nav-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .calendar-nav-btn:hover {
+            background-color: rgba(255,255,255,0.3);
+        }
+        
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .calendar-day-header {
+            text-align: center;
+            padding: 10px;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-auto-rows: minmax(80px, auto);
+        }
+        
+        .calendar-day {
+            padding: 10px;
+            border-left: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            min-height: 80px;
+            position: relative;
+        }
+        
+        .calendar-day:nth-child(7n) {
+            border-left: none;
+        }
+        
+        .calendar-grid .calendar-day:nth-last-child(-n+7) {
+            border-bottom: none;
+        }
+        
+        .today {
+            background-color: rgba(114, 103, 239, 0.05);
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .other-month {
+            color: var(--text-muted);
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .has-events::after {
+            content: '';
+            position: absolute;
+            bottom: 5px;
+            right: 50%;
+            transform: translateX(50%);
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+        }
+        
+        .timeline {
+            margin-top: 20px;
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding-right: 30px;
+            padding-bottom: 20px;
+        }
+        
+        .timeline-dot {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            right: 6px;
+            top: 14px;
+            bottom: 0;
+            width: 2px;
+            background-color: var(--border-color);
+        }
+        
+        .timeline-item:last-child::before {
+            display: none;
+        }
+        
+        .timeline-content {
+            padding: 15px;
+            background-color: var(--card-bg);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .timeline-title {
+            font-weight: 700;
+            color: var(--text-color);
+        }
+        
+        .timeline-date {
+            font-size: var(--font-xs);
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+        
+        /* Analytics */
+        .analytics-stats {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -10px;
+        }
+        
+        .analytics-item {
+            background-color: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin: 10px;
+            padding: 20px;
+            text-align: center;
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .analytics-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .analytics-value {
+            font-size: var(--font-xl);
+            font-weight: 800;
+            color: var(--text-color);
+            margin-bottom: 5px;
+        }
+        
+        .analytics-label {
+            color: var(--text-muted);
+            font-size: var(--font-sm);
+        }
+        
+        .progress-container {
+            margin-bottom: 20px;
+        }
+        
+        .progress-title {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .progress-label {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .progress-value {
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background-color: var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(to right, var(--primary-color), var(--primary-light));
+            border-radius: 10px;
+            width: 0;
+            transition: width 1s;
+        }
+        
+        /* Notifications */
+        .notification-item {
+            display: flex;
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s;
+        }
+        
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+        
+        .notification-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 15px;
+            flex-shrink: 0;
+            color: white;
+        }
+        
+        .notification-success {
+            background: linear-gradient(135deg, var(--success-color), #27ae60);
+        }
+        
+        .notification-danger {
+            background: linear-gradient(135deg, var(--danger-color), #c0392b);
+        }
+        
+        .notification-warning {
+            background: linear-gradient(135deg, var(--warning-color), #f57c00);
+        }
+        
+        .notification-info {
+            background: linear-gradient(135deg, var(--info-color), #00a8a3);
+        }
+        
+        .notification-content {
+            flex: 1;
+        }
+        
+        .notification-title {
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 3px;
+        }
+        
+        .notification-message {
+            color: var(--text-muted);
+            font-size: var(--font-sm);
+            margin-bottom: 5px;
+        }
+        
+        .notification-time {
+            font-size: var(--font-xs);
+            color: var(--text-muted);
+        }
+        
+        .notification-actions {
+            margin-top: 10px;
+        }
+        
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background-color: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal {
+            background-color: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            display: none;
+            animation: modal-fade 0.3s;
+        }
+        
+        @keyframes modal-fade {
+            from { opacity: 0; transform: translateY(-50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .modal-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .modal-title {
+            font-weight: 700;
+            font-size: var(--font-lg);
+            color: var(--text-color);
+        }
+        
+        .close-modal {
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: color 0.3s;
+        }
+        
+        .close-modal:hover {
+            color: var(--danger-color);
+        }
+        
+        .modal-body {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        /* Alerts */
+        .alert {
+            padding: 15px;
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .alert i {
+            margin-left: 15px;
+            font-size: 18px;
+        }
+        
+        .alert-success {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: var(--success-color);
+        }
+        
+        .alert-danger {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: var(--danger-color);
+        }
+        
+        .alert-warning {
+            background-color: rgba(255, 152, 0, 0.1);
+            color: var(--warning-color);
+        }
+        
+        .alert-info {
+            background-color: rgba(0, 206, 201, 0.1);
+            color: var(--info-color);
+        }
+        
+        /* Loader */
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background-color: rgba(255,255,255,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(114, 103, 239, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s infinite linear;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(100%);
+                width: 250px;
+            }
+            
+            .sidebar.expanded {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-right: 0;
+            }
+            
+            .sidebar.collapsed ~ .main-content {
+                margin-right: 0;
+            }
+            
+            .sidebar-toggle {
+                left: 20px;
+                top: 20px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-stats {
+                flex-direction: column;
+            }
+            
+            .stat-card {
+                min-width: 100%;
+            }
+            
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .form-row .form-group {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body class="font-medium theme-light">
+    <!-- Loader Overlay -->
+    <div class="loader-overlay">
+        <div class="loader"></div>
+    </div>
+    
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="logo-text">نظام الاستثمار</div>
+            </div>
+            
+            <ul class="menu">
+                <li class="menu-item active" data-page="dashboard">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <span class="menu-label">لوحة التحكم</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="investors">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <span class="menu-label">المستثمرين</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="operations">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <span class="menu-label">العمليات</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="profits">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                        <span class="menu-label">الأرباح</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="analytics">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <span class="menu-label">التحليلات</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="reports">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <span class="menu-label">التقارير</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="calendar">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <span class="menu-label">التقويم</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="notifications">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <span class="menu-label">الإشعارات</span>
+                        <span class="menu-badge">3</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="settings">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <span class="menu-label">الإعدادات</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="backup">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <span class="menu-label">النسخ الاحتياطي</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="profile">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <span class="menu-label">الملف الشخصي</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" data-page="help">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-question-circle"></i>
+                        </div>
+                        <span class="menu-label">المساعدة</span>
+                    </a>
+                </li>
+                
+                <li class="menu-item" id="logout-btn">
+                    <a href="#">
+                        <div class="menu-icon">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </div>
+                        <span class="menu-label">تسجيل الخروج</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- Sidebar Toggle Button -->
+        <div class="sidebar-toggle">
+            <i class="fas fa-bars"></i>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <div class="header">
+                <h1 class="page-title">
+                    <i class="fas fa-home" style="color: var(--primary-color);"></i>
+                    لوحة التحكم
+                </h1>
+                
+                <div class="header-actions">
+                    <div class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge">3</span>
+                    </div>
+                    
+                    <div class="user-profile">
+                        <div class="user-avatar">م</div>
+                        <div>
+                            <div class="user-name">مدير النظام</div>
+                            <div class="user-role">مشرف</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pages -->
+            <!-- Dashboard Page -->
+            <div class="page active" id="dashboard">
+                <div class="dashboard-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">0</div>
+                            <div class="stat-label">عدد المستثمرين</div>
+                            <div class="stat-change positive">
+                                <i class="fas fa-arrow-up"></i>
+                                4.5% هذا الشهر
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, var(--success-color), #27ae60);">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">0</div>
+                            <div class="stat-label">إجمالي الاستثمارات</div>
+                            <div class="stat-change positive">
+                                <i class="fas fa-arrow-up"></i>
+                                12% هذا الشهر
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, var(--warning-color), #f57c00);">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">0</div>
+                            <div class="stat-label">الأرباح الشهرية</div>
+                            <div class="stat-change positive">
+                                <i class="fas fa-arrow-up"></i>
+                                5.2% هذا الشهر
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, var(--info-color), #00a8a3);">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">0</div>
+                            <div class="stat-label">العمليات الشهرية</div>
+                            <div class="stat-change positive">
+                                <i class="fas fa-arrow-up"></i>
+                                7.8% هذا الشهر
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                    <div style="flex: 2; padding: 10px; min-width: 500px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-chart-line"></i>
+                                    تحليل الاستثمارات والأرباح
+                                </div>
+                                <div class="chart-tabs">
+                                    <div class="card-tab active" data-chart="monthly">شهري</div>
+                                    <div class="card-tab" data-chart="yearly">سنوي</div>
+                                    <div class="card-tab" data-chart="weekly">أسبوعي</div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="investments-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-exchange-alt"></i>
+                                    آخر العمليات
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>المستثمر</th>
+                                                <th>نوع العملية</th>
+                                                <th>المبلغ</th>
+                                                <th>التاريخ</th>
+                                                <th>الحالة</th>
+                                                <th>إجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td colspan="6" style="text-align: center;">لا توجد عمليات</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    أحداث قادمة
+                                </div>
+                                <a href="#" class="card-tab" data-page="calendar">عرض الكل</a>
+                            </div>
+                            <div class="card-body">
+                                <div class="timeline">
+                                    <div style="text-align: center; color: var(--text-muted);">
+                                        لا توجد أحداث قادمة
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-bell"></i>
+                                    آخر الإشعارات
+                                </div>
+                                <a href="#" class="card-tab" data-page="notifications">عرض الكل</a>
+                            </div>
+                            <div class="card-body">
+                                <div class="notification-item">
+                                    <div class="notification-icon notification-success">
+                                        <i class="fas fa-check-circle"></i>
+                                    </div>
+                                    <div class="notification-content">
+                                        <div class="notification-title">مستثمر جديد</div>
+                                        <div class="notification-message">تم إضافة مستثمر جديد: أحمد محمد</div>
+                                        <div class="notification-time">منذ 30 دقيقة</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="notification-item">
+                                    <div class="notification-icon notification-warning">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </div>
+                                    <div class="notification-content">
+                                        <div class="notification-title">أرباح مستحقة</div>
+                                        <div class="notification-message">هناك أرباح مستحقة للتوزيع هذا الشهر</div>
+                                        <div class="notification-time">منذ 2 ساعة</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="notification-item">
+                                    <div class="notification-icon notification-info">
+                                        <i class="fas fa-info-circle"></i>
+                                    </div>
+                                    <div class="notification-content">
+                                        <div class="notification-title">تحديث النظام</div>
+                                        <div class="notification-message">تم تحديث النظام إلى النسخة الجديدة</div>
+                                        <div class="notification-time">منذ 1 يوم</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Investors Page -->
+            <div class="page" id="investors">
+                <div class="row" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                    <div class="search-box">
+                        <input type="text" class="search-input" id="investor-search" placeholder="البحث عن مستثمر...">
+                    </div>
+                    
+                    <button class="btn btn-primary btn-round" id="add-investor-btn">
+                        <i class="fas fa-plus"></i>
+                        إضافة مستثمر جديد
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-users"></i>
+                            قائمة المستثمرين
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>الاسم</th>
+                                        <th>رقم الهاتف</th>
+                                        <th>العنوان</th>
+                                        <th>رقم البطاقة</th>
+                                        <th>المبلغ المستثمر</th>
+                                        <th>الربح الشهري</th>
+                                        <th>إجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="investors-table-body">
+                                    <tr>
+                                        <td colspan="7" style="text-align: center;">لا يوجد مستثمرين</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Operations Page -->
+            <div class="page" id="operations">
+                <div class="row" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                    <div class="search-box">
+                        <input type="text" class="search-input" id="operation-search" placeholder="البحث عن عملية...">
+                    </div>
+                    
+                    <div>
+                        <button class="btn btn-success btn-round" id="add-deposit-btn">
+                            <i class="fas fa-plus"></i>
+                            إضافة إيداع
+                        </button>
+                        <button class="btn btn-danger btn-round" id="add-withdrawal-btn">
+                            <i class="fas fa-minus"></i>
+                            إضافة سحب
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="analytics-stats">
+                    <div class="analytics-item">
+                        <div class="analytics-icon" style="background: linear-gradient(135deg, var(--success-color), #27ae60); color: white; margin-bottom: 15px;">
+                            <i class="fas fa-arrow-up"></i>
+                        </div>
+                        <div class="analytics-value">0</div>
+                        <div class="analytics-label">إيداعات</div>
+                    </div>
+                    
+                    <div class="analytics-item">
+                        <div class="analytics-icon" style="background: linear-gradient(135deg, var(--danger-color), #c0392b); color: white; margin-bottom: 15px;">
+                            <i class="fas fa-arrow-down"></i>
+                        </div>
+                        <div class="analytics-value">0</div>
+                        <div class="analytics-label">سحوبات</div>
+                    </div>
+                    
+                    <div class="analytics-item">
+                        <div class="analytics-icon" style="background: linear-gradient(135deg, var(--warning-color), #f57c00); color: white; margin-bottom: 15px;">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                        <div class="analytics-value">0</div>
+                        <div class="analytics-label">أرباح</div>
+                    </div>
+                    
+                    <div class="analytics-item">
+                        <div class="analytics-icon" style="background: linear-gradient(135deg, var(--info-color), #00a8a3); color: white; margin-bottom: 15px;">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <div class="analytics-value">0</div>
+                        <div class="analytics-label">إجمالي العمليات</div>
+                    </div>
+                </div>
+                
+                <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                    <div style="flex: 2; padding: 10px; min-width: 500px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-list-alt"></i>
+                                    سجل العمليات
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>المستثمر</th>
+                                                <th>نوع العملية</th>
+                                                <th>المبلغ</th>
+                                                <th>تأثير الربح</th>
+                                                <th>التاريخ</th>
+                                                <th>الحالة</th>
+                                                <th>إجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td colspan="7" style="text-align: center;">لا توجد عمليات</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-chart-pie"></i>
+                                    توزيع العمليات
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="operations-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Profits Page -->
+            <div class="page" id="profits">
+                <div class="analytics-stats">
+                    <div class="analytics-item">
+                        <div class="analytics-icon" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-light)); color: white; margin-bottom: 15px;">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <div class="analytics-value">0</div>
+                        <div class="analytics-label">الأرباح الشهرية</div>
+                    </div>
+                    
+                    <div class="analytics-item">
+                        <div class="analytics-icon" style="background: linear-gradient(135deg, var(--success-color), #27ae60); color: white; margin-bottom: 15px;">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="analytics-value">0</div>
+                        <div class="analytics-label">الأرباح السنوية المتوقعة</div>
+                    </div>
+                    
+                    <div class="analytics-item">
+                        <div class="analytics-icon" style="background: linear-gradient(135deg, var(--info-color), #00a8a3); color: white; margin-bottom: 15px;">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="analytics-value">0</div>
+                        <div class="analytics-label">المتوسط اليومي</div>
+                    </div>
+                    
+                    <div class="analytics-item">
+                        <div class="analytics-icon" style="background: linear-gradient(135deg, var(--warning-color), #f57c00); color: white; margin-bottom: 15px;">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div class="analytics-value">0%</div>
+                        <div class="analytics-label">معدل النمو</div>
+                    </div>
+                </div>
+                
+                <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                    <div style="flex: 2; padding: 10px; min-width: 500px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-hand-holding-usd"></i>
+                                    أرباح المستثمرين
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>المستثمر</th>
+                                                <th>المبلغ المستثمر</th>
+                                                <th>الربح الشهري</th>
+                                                <th>تاريخ الاستثمار</th>
+                                                <th>عدد الأيام</th>
+                                                <th>آخر توزيع</th>
+                                                <th>إجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td colspan="7" style="text-align: center;">لا يوجد أرباح</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-chart-area"></i>
+                                    تحليل الأرباح
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="profits-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analytics Page -->
+            <div class="page" id="analytics">
+                <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-chart-pie"></i>
+                                    توزيع الاستثمارات
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="progress-container">
+                                    <div class="progress-title">
+                                        <div class="progress-label">استثمارات كبيرة (>5,000,000)</div>
+                                        <div class="progress-value">0%</div>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="progress-container">
+                                    <div class="progress-title">
+                                        <div class="progress-label">استثمارات متوسطة (1,000,000 - 5,000,000)</div>
+                                        <div class="progress-value">0%</div>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="progress-container">
+                                    <div class="progress-title">
+                                        <div class="progress-label">استثمارات صغيرة (<1,000,000)</div>
+                                        <div class="progress-value">0%</div>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    التوزيع الجغرافي
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="progress-container">
+                                    <div class="progress-title">
+                                        <div class="progress-label">بغداد</div>
+                                        <div class="progress-value">0%</div>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="progress-container">
+                                    <div class="progress-title">
+                                        <div class="progress-label">البصرة</div>
+                                        <div class="progress-value">0%</div>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="progress-container">
+                                    <div class="progress-title">
+                                        <div class="progress-label">أربيل</div>
+                                        <div class="progress-value">0%</div>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="progress-container">
+                                    <div class="progress-title">
+                                        <div class="progress-label">مناطق أخرى</div>
+                                        <div class="progress-value">0%</div>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                    <div style="flex: 2; padding: 10px; min-width: 500px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-chart-line"></i>
+                                    تطور الأرباح
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="profit-trends-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-calendar-day"></i>
+                                    توزيع العمليات الشهرية
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="monthly-operations-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Reports Page -->
+            <div class="page" id="reports">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-file-alt"></i>
+                            إنشاء تقرير جديد
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>نوع التقرير</label>
+                                <select class="form-control" id="report-type">
+                                    <option value="monthly">تقرير شهري</option>
+                                    <option value="investor">تقرير المستثمرين</option>
+                                    <option value="operations">تقرير العمليات</option>
+                                    <option value="profits">تقرير الأرباح</option>
+                                    <option value="summary">تقرير ملخص</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>المستثمر (اختياري)</label>
+                                <select class="form-control" id="report-investor">
+                                    <option value="">جميع المستثمرين</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>من تاريخ</label>
+                                <input type="date" class="form-control" id="report-from">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>إلى تاريخ</label>
+                                <input type="date" class="form-control" id="report-to">
+                            </div>
+                            
+                            <div class="form-group" style="display: flex; align-items: flex-end;">
+                                <button class="btn btn-primary" id="generate-report-btn">
+                                    <i class="fas fa-cog"></i>
+                                    إنشاء التقرير
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="report-results"></div>
+            </div>
+            
+            <!-- Calendar Page -->
+            <div class="page" id="calendar">
+                <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                    <div style="flex: 2; padding: 10px; min-width: 500px;">
+                        <div class="calendar">
+                            <div class="calendar-header">
+                                <div class="calendar-nav">
+                                    <div class="calendar-nav-btn">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </div>
+                                </div>
+                                <div class="calendar-title">مايو 2025</div>
+                                <div class="calendar-nav">
+                                    <div class="calendar-nav-btn">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="calendar-days">
+                                <div class="calendar-day-header">السبت</div>
+                                <div class="calendar-day-header">الأحد</div>
+                                <div class="calendar-day-header">الاثنين</div>
+                                <div class="calendar-day-header">الثلاثاء</div>
+                                <div class="calendar-day-header">الأربعاء</div>
+                                <div class="calendar-day-header">الخميس</div>
+                                <div class="calendar-day-header">الجمعة</div>
+                            </div>
+                            
+                            <div class="calendar-grid">
+                                <div class="calendar-day other-month">27</div>
+                                <div class="calendar-day other-month">28</div>
+                                <div class="calendar-day other-month">29</div>
+                                <div class="calendar-day other-month">30</div>
+                                <div class="calendar-day">1</div>
+                                <div class="calendar-day">2</div>
+                                <div class="calendar-day">3</div>
+                                <div class="calendar-day">4</div>
+                                <div class="calendar-day">5</div>
+                                <div class="calendar-day today">6
+                                    <div style="font-size: 10px;">اليوم</div>
+                                </div>
+                                <div class="calendar-day">7</div>
+                                <div class="calendar-day">8</div>
+                                <div class="calendar-day">9</div>
+                                <div class="calendar-day">10</div>
+                                <div class="calendar-day">11</div>
+                                <div class="calendar-day">12</div>
+                                <div class="calendar-day">13</div>
+                                <div class="calendar-day">14</div>
+                                <div class="calendar-day">15</div>
+                                <div class="calendar-day">16</div>
+                                <div class="calendar-day">17</div>
+                                <div class="calendar-day">18</div>
+                                <div class="calendar-day">19</div>
+                                <div class="calendar-day">20</div>
+                                <div class="calendar-day">21</div>
+                                <div class="calendar-day">22</div>
+                                <div class="calendar-day">23</div>
+                                <div class="calendar-day">24</div>
+                                <div class="calendar-day">25</div>
+                                <div class="calendar-day">26</div>
+                                <div class="calendar-day">27</div>
+                                <div class="calendar-day">28</div>
+                                <div class="calendar-day">29</div>
+                                <div class="calendar-day">30</div>
+                                <div class="calendar-day">31</div>
+                                <div class="calendar-day other-month">1</div>
+                                <div class="calendar-day other-month">2</div>
+                                <div class="calendar-day other-month">3</div>
+                                <div class="calendar-day other-month">4</div>
+                                <div class="calendar-day other-month">5</div>
+                                <div class="calendar-day other-month">6</div>
+                                <div class="calendar-day other-month">7</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1; padding: 10px; min-width: 350px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-calendar-check"></i>
+                                    الأحداث القادمة
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="timeline">
+                                    <div style="text-align: center; color: var(--text-muted);">
+                                        لا توجد أحداث قادمة
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Notifications Page -->
+            <div class="page" id="notifications">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-bell"></i>
+                            الإشعارات
+                        </div>
+                        <button class="btn btn-outline-primary btn-round">
+                            <i class="fas fa-check-double"></i>
+                            تحديد الكل كمقروء
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="notifications-container">
+                            <div class="notification-item" style="background-color: rgba(114, 103, 239, 0.1);">
+                                <div class="notification-icon notification-success">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="notification-content">
+                                    <div class="notification-title">مستثمر جديد</div>
+                                    <div class="notification-message">تم إضافة مستثمر جديد: أحمد محمد</div>
+                                    <div class="notification-time">منذ 30 دقيقة</div>
+                                    <div class="notification-actions">
+                                        <button class="btn btn-sm btn-outline-primary">
+                                            تحديد كمقروء
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="notification-item" style="background-color: rgba(114, 103, 239, 0.1);">
+                                <div class="notification-icon notification-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <div class="notification-content">
+                                    <div class="notification-title">أرباح مستحقة</div>
+                                    <div class="notification-message">هناك أرباح مستحقة للتوزيع هذا الشهر</div>
+                                    <div class="notification-time">منذ 2 ساعة</div>
+                                    <div class="notification-actions">
+                                        <button class="btn btn-sm btn-outline-primary">
+                                            تحديد كمقروء
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="notification-item">
+                                <div class="notification-icon notification-info">
+                                    <i class="fas fa-info-circle"></i>
+                                </div>
+                                <div class="notification-content">
+                                    <div class="notification-title">تحديث النظام</div>
+                                    <div class="notification-message">تم تحديث النظام إلى النسخة الجديدة</div>
+                                    <div class="notification-time">منذ 1 يوم</div>
+                                    <div class="notification-actions">
+                                        <button class="btn btn-sm btn-outline-primary">
+                                            تحديد كغير مقروء
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Page -->
+            <div class="page" id="settings">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-cog"></i>
+                            إعدادات النظام
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>نسبة الفائدة الشهرية (%)</label>
+                                <input type="number" class="form-control" id="interest-rate" value="1.75" step="0.01" min="0">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>العملة</label>
+                                <select class="form-control" id="currency">
+                                    <option value="IQD">دينار عراقي (IQD)</option>
+                                    <option value="USD">دولار أمريكي (USD)</option>
+                                    <option value="EUR">يورو (EUR)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>مظهر النظام</label>
+                                <select class="form-control" id="theme">
+                                    <option value="light">فاتح</option>
+                                    <option value="dark">داكن</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>اللون الرئيسي</label>
+                                <select class="form-control" id="primary-color">
+                                    <option value="purple">بنفسجي</option>
+                                    <option value="blue">أزرق</option>
+                                    <option value="green">أخضر</option>
+                                    <option value="red">أحمر</option>
+                                    <option value="orange">برتقالي</option>
+                                    <option value="teal">تركواز</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>اللغة</label>
+                                <select class="form-control" id="language">
+                                    <option value="ar">العربية</option>
+                                    <option value="en">الإنجليزية</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>المنطقة الزمنية</label>
+                                <select class="form-control" id="timezone">
+                                    <option value="Asia/Baghdad">بغداد (GMT+3)</option>
+                                    <option value="Asia/Riyadh">الرياض (GMT+3)</option>
+                                    <option value="Asia/Dubai">دبي (GMT+4)</option>
+                                    <option value="Europe/London">لندن (GMT+0)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>تنسيق التاريخ</label>
+                                <select class="form-control" id="date-format">
+                                    <option value="dd/mm/yyyy">يوم/شهر/سنة</option>
+                                    <option value="mm/dd/yyyy">شهر/يوم/سنة</option>
+                                    <option value="yyyy-mm-dd">سنة-شهر-يوم</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>تنسيق الوقت</label>
+                                <select class="form-control" id="time-format">
+                                    <option value="12">12 ساعة</option>
+                                    <option value="24">24 ساعة</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>وضع القائمة الجانبية</label>
+                                <select class="form-control" id="sidebar-mode">
+                                    <option value="expanded">موسعة</option>
+                                    <option value="collapsed">مطوية</option>
+                                    <option value="auto">تلقائي</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>حجم الخط</label>
+                                <select class="form-control" id="font-size">
+                                    <option value="small">صغير</option>
+                                    <option value="medium" selected>متوسط</option>
+                                    <option value="large">كبير</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>الخروج التلقائي (دقائق)</label>
+                                <select class="form-control" id="auto-logout">
+                                    <option value="0">معطل</option>
+                                    <option value="15">15 دقيقة</option>
+                                    <option value="30">30 دقيقة</option>
+                                    <option value="60">60 دقيقة</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>المصادقة الثنائية</label>
+                                <select class="form-control" id="two-factor">
+                                    <option value="disabled">معطلة</option>
+                                    <option value="email">بالبريد الإلكتروني</option>
+                                    <option value="sms">برسالة نصية</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>تتبع نشاط المستخدم</label>
+                                <select class="form-control" id="user-activity">
+                                    <option value="enabled">مفعل</option>
+                                    <option value="disabled">معطل</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>النسخ الاحتياطي التلقائي</label>
+                                <select class="form-control" id="auto-backup">
+                                    <option value="disabled">معطل</option>
+                                    <option value="daily">يومي</option>
+                                    <option value="weekly">أسبوعي</option>
+                                    <option value="monthly">شهري</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>يوم توزيع الأرباح</label>
+                                <select class="form-control" id="profit-day">
+                                    <option value="1">اليوم 1 من الشهر</option>
+                                    <option value="15">اليوم 15 من الشهر</option>
+                                    <option value="last">آخر يوم من الشهر</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>حساب الأرباح النسبية</label>
+                                <select class="form-control" id="proportional-profits">
+                                    <option value="enabled">مفعل</option>
+                                    <option value="disabled">معطل</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-primary" id="save-settings-btn">
+                            <i class="fas fa-save"></i>
+                            حفظ الإعدادات
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Backup Page -->
+            <div class="page" id="backup">
+                <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                    <div style="flex: 2; padding: 10px; min-width: 500px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-database"></i>
+                                    النسخ الاحتياطية
+                                </div>
+                                <button class="btn btn-primary btn-round" id="create-backup-btn">
+                                    <i class="fas fa-plus"></i>
+                                    إنشاء نسخة احتياطية
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>الاسم</th>
+                                                <th>التاريخ</th>
+                                                <th>الحجم</th>
+                                                <th>النوع</th>
+                                                <th>إجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td colspan="5" style="text-align: center;">لا توجد نسخ احتياطية</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- إكمال صفحة النسخ الاحتياطي -->
+<div style="flex: 1; padding: 10px; min-width: 350px;">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-upload"></i>
+                تصدير واستيراد البيانات
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label>تصدير البيانات</label>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>تنسيق التصدير</label>
+                        <select class="form-control" id="export-format">
+                            <option value="json">JSON</option>
+                            <option value="csv">CSV</option>
+                            <option value="excel">Excel</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>بيانات التصدير</label>
+                    <div>
+                        <label class="checkbox-inline" style="margin-left: 15px;">
+                            <input type="checkbox" id="export-investors" checked> المستثمرين
+                        </label>
+                        <label class="checkbox-inline" style="margin-left: 15px;">
+                            <input type="checkbox" id="export-operations" checked> العمليات
+                        </label>
+                        <label class="checkbox-inline" style="margin-left: 15px;">
+                            <input type="checkbox" id="export-profits" checked> الأرباح
+                        </label>
+                        <label class="checkbox-inline">
+                            <input type="checkbox" id="export-settings" checked> الإعدادات
+                        </label>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="export-data-btn">
+                    <i class="fas fa-download"></i>
+                    تصدير البيانات
+                </button>
+            </div>
+            
+            <div class="form-group" style="margin-top: 20px;">
+                <label>استيراد البيانات</label>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ملف الاستيراد</label>
+                        <div style="display: flex;">
+                            <input type="file" class="form-control" id="import-data-file">
+                            <button class="btn btn-primary" id="import-data-btn" style="margin-right: 10px;">
+                                <i class="fas fa-upload"></i>
+                                استيراد
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    تنبيه: سيؤدي استيراد البيانات إلى استبدال البيانات الحالية. يرجى عمل نسخة احتياطية قبل الاستيراد.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Profile Page -->
+<div class="page" id="profile">
+    <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+        <div style="flex: 1; padding: 10px; min-width: 350px;">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-user"></i>
+                        المعلومات الشخصية
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">
+                        <div style="width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-color), var(--primary-light)); color: white; display: flex; align-items: center; justify-content: center; font-size: 40px; margin-bottom: 15px;">
+                            م
+                        </div>
+                        <div style="font-size: var(--font-lg); font-weight: 700; margin-bottom: 5px;">مدير النظام</div>
+                        <div style="color: var(--text-muted);">مشرف</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>الاسم الكامل</label>
+                        <input type="text" class="form-control" value="مدير النظام">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>البريد الإلكتروني</label>
+                        <input type="email" class="form-control" value="admin@example.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>رقم الهاتف</label>
+                        <input type="tel" class="form-control" value="+964 7XX XXX XXXX">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>المنصب</label>
+                        <input type="text" class="form-control" value="مشرف النظام">
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        حفظ التغييرات
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div style="flex: 1; padding: 10px; min-width: 350px;">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-lock"></i>
+                        تغيير كلمة المرور
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>كلمة المرور الحالية</label>
+                        <input type="password" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>كلمة المرور الجديدة</label>
+                        <input type="password" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>تأكيد كلمة المرور الجديدة</label>
+                        <input type="password" class="form-control">
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-key"></i>
+                        تغيير كلمة المرور
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-shield-alt"></i>
+                        أمان الحساب
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>المصادقة الثنائية</label>
+                        <select class="form-control">
+                            <option value="disabled">معطلة</option>
+                            <option value="email">تفعيل عبر البريد الإلكتروني</option>
+                            <option value="sms">تفعيل عبر الرسائل النصية</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>إشعارات تسجيل الدخول</label>
+                        <select class="form-control">
+                            <option value="enabled">مفعلة</option>
+                            <option value="disabled">معطلة</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>سجل النشاط</label>
+                        <button class="btn btn-outline-primary btn-block">
+                            <i class="fas fa-history"></i>
+                            عرض سجل النشاط
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Help Page -->
+<div class="page" id="help">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-question-circle"></i>
+                الأسئلة الشائعة
+            </div>
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يتم إضافة مستثمر جديد؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>لإضافة مستثمر جديد، اتبع الخطوات التالية:</p>
+                    <ol>
+                        <li>انتقل إلى صفحة "المستثمرين" من القائمة الجانبية.</li>
+                        <li>انقر على زر "إضافة مستثمر جديد" في أعلى الصفحة.</li>
+                        <li>قم بتعبئة نموذج المستثمر بالمعلومات المطلوبة (الاسم، رقم الهاتف، العنوان، إلخ).</li>
+                        <li>حدد المبلغ الأولي للاستثمار وتاريخ بدء الاستثمار.</li>
+                        <li>انقر على زر "إضافة" لإضافة المستثمر.</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يتم إضافة عملية إيداع أو سحب؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>لإضافة عملية إيداع أو سحب، اتبع الخطوات التالية:</p>
+                    <ol>
+                        <li>انتقل إلى صفحة "العمليات" من القائمة الجانبية.</li>
+                        <li>انقر على زر "إضافة إيداع" أو "إضافة سحب" في أعلى الصفحة.</li>
+                        <li>حدد المستثمر من القائمة المنسدلة.</li>
+                        <li>أدخل المبلغ وتاريخ العملية والتفاصيل.</li>
+                        <li>انقر على زر "إضافة" لإضافة العملية.</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يتم توزيع الأرباح؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>لتوزيع الأرباح، اتبع الخطوات التالية:</p>
+                    <ol>
+                        <li>انتقل إلى صفحة "الأرباح" من القائمة الجانبية.</li>
+                        <li>ستجد قائمة بالمستثمرين وأرباحهم المتوقعة.</li>
+                        <li>انقر على زر "توزيع الربح" بجانب المستثمر المطلوب.</li>
+                        <li>تأكد من المبلغ وتاريخ التوزيع.</li>
+                        <li>انقر على زر "توزيع الربح" لتأكيد العملية.</li>
+                    </ol>
+                    <p>يمكنك أيضًا توزيع الأرباح لجميع المستثمرين دفعة واحدة من خلال الضغط على "توزيع جميع الأرباح" في أعلى الصفحة.</p>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يتم حساب الأرباح؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>يتم حساب الأرباح على النحو التالي:</p>
+                    <ul>
+                        <li>يتم حساب الربح الشهري بضرب إجمالي المبلغ المستثمر في نسبة الفائدة الشهرية (المحددة في الإعدادات).</li>
+                        <li>مثال: إذا كان المبلغ المستثمر 10,000,000 دينار ونسبة الفائدة 1.75%، فإن الربح الشهري سيكون 175,000 دينار.</li>
+                        <li>في حالة تفعيل خاصية "حساب الأرباح النسبية"، سيتم حساب الربح بناءً على عدد أيام الاستثمار في الشهر.</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يمكنني عمل نسخة احتياطية للبيانات؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>لعمل نسخة احتياطية للبيانات، اتبع الخطوات التالية:</p>
+                    <ol>
+                        <li>انتقل إلى صفحة "النسخ الاحتياطي" من القائمة الجانبية.</li>
+                        <li>انقر على زر "إنشاء نسخة احتياطية" في أعلى الصفحة.</li>
+                        <li>يمكنك أيضًا تصدير البيانات بتنسيقات مختلفة (JSON، CSV، Excel) من خلال قسم "تصدير واستيراد البيانات".</li>
+                    </ol>
+                    <p>لاستعادة نسخة احتياطية، انقر على زر "استعادة" بجانب النسخة المطلوبة في قائمة النسخ الاحتياطية.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-headset"></i>
+                الدعم الفني
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                للحصول على المساعدة أو الإبلاغ عن مشكلة، يرجى التواصل مع فريق الدعم الفني عبر إحدى الطرق التالية:
+            </div>
+            
+            <div style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                <div style="flex: 1; padding: 10px; min-width: 250px;">
+                    <div style="background-color: var(--card-bg); padding: 20px; border-radius: var(--radius-md); text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="fas fa-envelope" style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;"></i>
+                        <div style="font-weight: 600; margin-bottom: 5px;">البريد الإلكتروني</div>
+                        <div style="color: var(--text-muted);">support@example.com</div>
+                    </div>
+                </div>
+                
+                <div style="flex: 1; padding: 10px; min-width: 250px;">
+                    <div style="background-color: var(--card-bg); padding: 20px; border-radius: var(--radius-md); text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="fas fa-phone" style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;"></i>
+                        <div style="font-weight: 600; margin-bottom: 5px;">الهاتف</div>
+                        <div style="color: var(--text-muted);">+964 7XX XXX XXXX</div>
+                    </div>
+                </div>
+                
+                <div style="flex: 1; padding: 10px; min-width: 250px;">
+                    <div style="background-color: var(--card-bg); padding: 20px; border-radius: var(--radius-md); text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="fas fa-comments" style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;"></i>
+                        <div style="font-weight: 600; margin-bottom: 5px;">المحادثة المباشرة</div>
+                        <div style="color: var(--text-muted);">متاحة من 9 ص - 5 م</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <div class="form-group">
+                    <label>الموضوع</label>
+                    <input type="text" class="form-control" placeholder="أدخل عنوان المشكلة">
+                </div>
+                
+                <div class="form-group">
+                    <label>الرسالة</label>
+                    <textarea class="form-control" rows="5" placeholder="اكتب تفاصيل المشكلة هنا..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>إرفاق ملف (اختياري)</label>
+                    <input type="file" class="form-control">
+                </div>
+                
+                <button class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i>
+                    إرسال الرسالة
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<!-- Investor Modal -->
+<div class="modal-overlay" id="investor-modal-overlay">
+    <div class="modal" id="investor-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">إضافة مستثمر جديد</div>
+                <span class="close-modal" id="investor-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="investor-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>الاسم الكامل <span style="color: var(--danger-color);">*</span></label>
+                            <input type="text" class="form-control" id="investor-name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>رقم الهاتف <span style="color: var(--danger-color);">*</span></label>
+                            <input type="tel" class="form-control" id="investor-phone" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>رقم البطاقة <span style="color: var(--danger-color);">*</span></label>
+                            <input type="text" class="form-control" id="investor-id-card" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>البريد الإلكتروني</label>
+                            <input type="email" class="form-control" id="investor-email">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>العنوان</label>
+                        <input type="text" class="form-control" id="investor-address">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>المهنة</label>
+                            <input type="text" class="form-control" id="investor-job">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>المبلغ المستثمر <span style="color: var(--danger-color);">*</span></label>
+                            <input type="number" class="form-control" id="investor-amount" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>تاريخ الاستثمار <span style="color: var(--danger-color);">*</span></label>
+                        <input type="date" class="form-control" id="investor-date" required>
+                        <div id="investor-date-message" style="font-size: var(--font-xs); margin-top: 5px;"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>ملاحظات</label>
+                        <textarea class="form-control" id="investor-notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" id="investor-form-cancel">إلغاء</button>
+                <button type="submit" class="btn btn-primary" form="investor-form">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Operation Modal -->
+<div class="modal-overlay" id="operation-modal-overlay">
+    <div class="modal" id="operation-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="operation-modal-title">إضافة عملية جديدة</div>
+                <span class="close-modal" id="operation-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="operation-form">
+                    <div class="form-group">
+                        <label>نوع العملية <span style="color: var(--danger-color);">*</span></label>
+                        <select class="form-control" id="operation-type" required>
+                            <option value="deposit">إيداع</option>
+                            <option value="withdrawal">سحب</option>
+                            <option value="profit">توزيع ربح</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>المستثمر <span style="color: var(--danger-color);">*</span></label>
+                        <select class="form-control" id="operation-investor" required>
+                            <option value="">اختر المستثمر</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>المبلغ <span style="color: var(--danger-color);">*</span></label>
+                        <input type="number" class="form-control" id="operation-amount" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>تاريخ العملية <span style="color: var(--danger-color);">*</span></label>
+                        <input type="date" class="form-control" id="operation-date" required>
+                        <div id="operation-date-message" style="font-size: var(--font-xs); margin-top: 5px;"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>تفاصيل</label>
+                        <textarea class="form-control" id="operation-details" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" id="operation-form-cancel">إلغاء</button>
+                <button type="submit" class="btn btn-primary" form="operation-form">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+    // Initialize when DOM is fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sidebar toggle
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarToggle = document.querySelector('.sidebar-toggle');
+        const mainContent = document.querySelector('.main-content');
+        
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            if (window.innerWidth > 1024) {
+                mainContent.style.marginRight = sidebar.classList.contains('collapsed') ? '70px' : '280px';
+            }
+        });
+        
+        // Navigation
+        const menuItems = document.querySelectorAll('.menu-item');
+        const pages = document.querySelectorAll('.page');
+        const pageTitle = document.querySelector('.page-title');
+        
+        menuItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Ignore if it's logout button
+                if (this.id === 'logout-btn') return;
+                
+                // Update active menu item
+                menuItems.forEach(menuItem => menuItem.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Show corresponding page
+                const pageId = this.getAttribute('data-page');
+                pages.forEach(page => page.classList.remove('active'));
+                document.getElementById(pageId).classList.add('active');
+                
+                // Update page title
+                const menuSpan = this.querySelector('span');
+                const menuIcon = this.querySelector('i');
+                pageTitle.innerHTML = `<i class="${menuIcon.className}" style="color: var(--primary-color);"></i> ${menuSpan.textContent}`;
+            });
+        });
+        
+        // Modal handling
+        const investorModalOverlay = document.getElementById('investor-modal-overlay');
+        const operationModalOverlay = document.getElementById('operation-modal-overlay');
+        const addInvestorBtn = document.getElementById('add-investor-btn');
+        const addDepositBtn = document.getElementById('add-deposit-btn');
+        const addWithdrawalBtn = document.getElementById('add-withdrawal-btn');
+        const investorModalClose = document.getElementById('investor-modal-close');
+        const operationModalClose = document.getElementById('operation-modal-close');
+        const investorFormCancel = document.getElementById('investor-form-cancel');
+        const operationFormCancel = document.getElementById('operation-form-cancel');
+        
+        // Open investor modal
+        if (addInvestorBtn) {
+            addInvestorBtn.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'block';
+                document.getElementById('investor-modal').style.display = 'block';
+            });
+        }
+        
+        // Open deposit modal
+        if (addDepositBtn) {
+            addDepositBtn.addEventListener('click', function() {
+                document.getElementById('operation-type').value = 'deposit';
+                document.getElementById('operation-modal-title').textContent = 'إضافة إيداع جديد';
+                operationModalOverlay.style.display = 'block';
+                document.getElementById('operation-modal').style.display = 'block';
+            });
+        }
+        
+        // Open withdrawal modal
+        if (addWithdrawalBtn) {
+            addWithdrawalBtn.addEventListener('click', function() {
+                document.getElementById('operation-type').value = 'withdrawal';
+                document.getElementById('operation-modal-title').textContent = 'إضافة سحب جديد';
+                operationModalOverlay.style.display = 'block';
+                document.getElementById('operation-modal').style.display = 'block';
+            });
+        }
+        
+        // Close investor modal
+        if (investorModalClose) {
+            investorModalClose.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Close operation modal
+        if (operationModalClose) {
+            operationModalClose.addEventListener('click', function() {
+                operationModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Cancel investor form
+        if (investorFormCancel) {
+            investorFormCancel.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Cancel operation form
+        if (operationFormCancel) {
+            operationFormCancel.addEventListener('click', function() {
+                operationModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', function(event) {
+            if (event.target === investorModalOverlay) {
+                investorModalOverlay.style.display = 'none';
+            }
+            if (event.target === operationModalOverlay) {
+                operationModalOverlay.style.display = 'none';
+            }
+        });
+        
+        // Help page accordion
+        const faqHeaders = document.querySelectorAll('#help .card-header');
+        faqHeaders.forEach(header => {
+            header.addEventListener('click', function() {
+                const body = this.nextElementSibling;
+                
+                // Toggle current panel
+                if (body.style.display === 'block') {
+                    body.style.display = 'none';
+                } else {
+                    body.style.display = 'block';
+                }
+            });
+        });
+        
+        // Chart tabs
+        const chartTabs = document.querySelectorAll('.card-tab');
+        chartTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const chartType = this.getAttribute('data-chart');
+                if (!chartType) return;
+                
+                // Update tabs
+                const tabs = this.parentElement.querySelectorAll('.card-tab');
+                tabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Update chart (would call the actual function from app.js)
+                console.log(`Updating chart to type: ${chartType}`);
+            });
+        });
+        
+        // Notification badge (simulate unread count)
+        const updateNotificationBadge = () => {
+            const badges = document.querySelectorAll('.notification-badge, .menu-badge');
+            badges.forEach(badge => {
+                badge.textContent = '3';
+                badge.style.display = 'flex';
+            });
+        };
+        
+        updateNotificationBadge();
+        
+        // Notification panel toggle
+        const notificationBtn = document.querySelector('.notification-btn');
+        if (notificationBtn) {
+            notificationBtn.addEventListener('click', function() {
+                // This would call the function from app.js
+                console.log('Toggle notifications panel');
+            });
+        }
+        
+        // Settings save button
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        if (saveSettingsBtn) {
+            saveSettingsBtn.addEventListener('click', function() {
+                // Show success alert (simulated)
+                showAlert('تم حفظ الإعدادات بنجاح', 'success');
+            });
+        }
+        
+        // Export data button
+        const exportDataBtn = document.getElementById('export-data-btn');
+        if (exportDataBtn) {
+            exportDataBtn.addEventListener('click', function() {
+                // Show loader
+                showLoader();
+                
+                // Simulate export
+                setTimeout(() => {
+                    hideLoader();
+                    showAlert('تم تصدير البيانات بنجاح', 'success');
+                }, 1000);
+            });
+        }
+        
+        // Import data button
+        const importDataBtn = document.getElementById('import-data-btn');
+        if (importDataBtn) {
+            importDataBtn.addEventListener('click', function() {
+                const fileInput = document.getElementById('import-data-file');
+                if (!fileInput.files.length) {
+                    showAlert('يرجى اختيار ملف', 'warning');
+                    return;
+                }
+                
+                // Confirm import
+                if (confirm('سيؤدي استيراد البيانات إلى استبدال البيانات الحالية. هل تريد المتابعة؟')) {
+                    // Show loader
+                    showLoader();
+                    
+                    // Simulate import
+                    setTimeout(() => {
+                        hideLoader();
+                        showAlert('تم استيراد البيانات بنجاح', 'success');
+                    }, 2000);
+                }
+            });
+        }
+        
+        // Report generation
+        const generateReportBtn = document.getElementById('generate-report-btn');
+        if (generateReportBtn) {
+            generateReportBtn.addEventListener('click', function() {
+                const fromDate = document.getElementById('report-from').value;
+                const toDate = document.getElementById('report-to').value;
+                
+                if (!fromDate || !toDate) {
+                    showAlert('يرجى تحديد فترة التقرير', 'warning');
+                    return;
+                }
+                
+                // Show loader
+                showLoader();
+                
+                // Simulate report generation
+                setTimeout(() => {
+                    hideLoader();
+                    
+                    // Add a sample report result
+                    const reportResults = document.getElementById('report-results');
+                    reportResults.innerHTML = `
+                        <div class="card card-gradient-border" style="margin-top: 20px;">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-file-alt"></i>
+                                    نتيجة التقرير
+                                </div>
+                                <button class="btn btn-outline-primary btn-round print-report-btn">
+                                    <i class="fas fa-print"></i>
+                                    طباعة التقرير
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <h3>تقرير ملخص (${formatDate(fromDate)} - ${formatDate(toDate)})</h3>
+                                <div style="display: flex; flex-wrap: wrap; margin: 20px 0;">
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--primary-color);">0</div>
+                                        <div>إجمالي المستثمرين</div>
+                                    </div>
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--success-color);">0 د.ع</div>
+                                        <div>إجمالي الاستثمارات</div>
+                                    </div>
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--warning-color);">0 د.ع</div>
+                                        <div>إجمالي الأرباح</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    لا توجد بيانات كافية في الفترة المحددة.
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add print functionality
+                    const printBtn = document.querySelector('.print-report-btn');
+                    if (printBtn) {
+                        printBtn.addEventListener('click', function() {
+                            window.print();
+                        });
+                    }
+                }, 1500);
+            });
+        }
+        
+        // Initialize date inputs with today's date
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        const today = new Date().toISOString().split('T')[0];
+        dateInputs.forEach(input => {
+            input.value = today;
+        });
+        
+        // Theme toggle (simulation)
+        document.getElementById('theme').addEventListener('change', function() {
+            document.body.classList.toggle('theme-dark');
+        });
+        
+        // Font size toggle (simulation)
+        document.getElementById('font-size').addEventListener('change', function() {
+            document.body.classList.remove('font-small', 'font-medium', 'font-large');
+            document.body.classList.add(`font-${this.value}`);
+        });
+    });
+    
+    // Helper functions
+    function showLoader() {
+        const loaderOverlay = document.querySelector('.loader-overlay');
+        if (loaderOverlay) {
+            loaderOverlay.style.display = 'flex';
+        }
+    }
+    
+    function hideLoader() {
+        const loaderOverlay = document.querySelector('.loader-overlay');
+        if (loaderOverlay) {
+            loaderOverlay.style.display = 'none';
+        }
+    }
+    
+    function showAlert(message, type = 'info') {
+        // Create alert element
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type}`;
+        alert.style.position = 'fixed';
+        alert.style.top = '20px';
+        alert.style.left = '50%';
+        alert.style.transform = 'translateX(-50%)';
+        alert.style.zIndex = '9999';
+        alert.style.minWidth = '300px';
+        alert.style.textAlign = 'center';
+        alert.style.boxShadow = 'var(--shadow-lg)';
+        alert.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            ${message}
+        `;
+        
+        // Add to body
+        document.body.appendChild(alert);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            alert.style.opacity = '0';
+            alert.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => {
+                document.body.removeChild(alert);
+            }, 500);
+        }, 3000);
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    }
+</script><!-- إكمال صفحة النسخ الاحتياطي -->
+<div style="flex: 1; padding: 10px; min-width: 350px;">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-upload"></i>
+                تصدير واستيراد البيانات
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label>تصدير البيانات</label>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>تنسيق التصدير</label>
+                        <select class="form-control" id="export-format">
+                            <option value="json">JSON</option>
+                            <option value="csv">CSV</option>
+                            <option value="excel">Excel</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>بيانات التصدير</label>
+                    <div>
+                        <label class="checkbox-inline" style="margin-left: 15px;">
+                            <input type="checkbox" id="export-investors" checked> المستثمرين
+                        </label>
+                        <label class="checkbox-inline" style="margin-left: 15px;">
+                            <input type="checkbox" id="export-operations" checked> العمليات
+                        </label>
+                        <label class="checkbox-inline" style="margin-left: 15px;">
+                            <input type="checkbox" id="export-profits" checked> الأرباح
+                        </label>
+                        <label class="checkbox-inline">
+                            <input type="checkbox" id="export-settings" checked> الإعدادات
+                        </label>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="export-data-btn">
+                    <i class="fas fa-download"></i>
+                    تصدير البيانات
+                </button>
+            </div>
+            
+            <div class="form-group" style="margin-top: 20px;">
+                <label>استيراد البيانات</label>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ملف الاستيراد</label>
+                        <div style="display: flex;">
+                            <input type="file" class="form-control" id="import-data-file">
+                            <button class="btn btn-primary" id="import-data-btn" style="margin-right: 10px;">
+                                <i class="fas fa-upload"></i>
+                                استيراد
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    تنبيه: سيؤدي استيراد البيانات إلى استبدال البيانات الحالية. يرجى عمل نسخة احتياطية قبل الاستيراد.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Profile Page -->
+<div class="page" id="profile">
+    <div class="row" style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+        <div style="flex: 1; padding: 10px; min-width: 350px;">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-user"></i>
+                        المعلومات الشخصية
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">
+                        <div style="width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-color), var(--primary-light)); color: white; display: flex; align-items: center; justify-content: center; font-size: 40px; margin-bottom: 15px;">
+                            م
+                        </div>
+                        <div style="font-size: var(--font-lg); font-weight: 700; margin-bottom: 5px;">مدير النظام</div>
+                        <div style="color: var(--text-muted);">مشرف</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>الاسم الكامل</label>
+                        <input type="text" class="form-control" value="مدير النظام">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>البريد الإلكتروني</label>
+                        <input type="email" class="form-control" value="admin@example.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>رقم الهاتف</label>
+                        <input type="tel" class="form-control" value="+964 7XX XXX XXXX">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>المنصب</label>
+                        <input type="text" class="form-control" value="مشرف النظام">
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        حفظ التغييرات
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div style="flex: 1; padding: 10px; min-width: 350px;">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-lock"></i>
+                        تغيير كلمة المرور
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>كلمة المرور الحالية</label>
+                        <input type="password" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>كلمة المرور الجديدة</label>
+                        <input type="password" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>تأكيد كلمة المرور الجديدة</label>
+                        <input type="password" class="form-control">
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-key"></i>
+                        تغيير كلمة المرور
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-shield-alt"></i>
+                        أمان الحساب
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>المصادقة الثنائية</label>
+                        <select class="form-control">
+                            <option value="disabled">معطلة</option>
+                            <option value="email">تفعيل عبر البريد الإلكتروني</option>
+                            <option value="sms">تفعيل عبر الرسائل النصية</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>إشعارات تسجيل الدخول</label>
+                        <select class="form-control">
+                            <option value="enabled">مفعلة</option>
+                            <option value="disabled">معطلة</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>سجل النشاط</label>
+                        <button class="btn btn-outline-primary btn-block">
+                            <i class="fas fa-history"></i>
+                            عرض سجل النشاط
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Help Page -->
+<div class="page" id="help">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-question-circle"></i>
+                الأسئلة الشائعة
+            </div>
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يتم إضافة مستثمر جديد؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>لإضافة مستثمر جديد، اتبع الخطوات التالية:</p>
+                    <ol>
+                        <li>انتقل إلى صفحة "المستثمرين" من القائمة الجانبية.</li>
+                        <li>انقر على زر "إضافة مستثمر جديد" في أعلى الصفحة.</li>
+                        <li>قم بتعبئة نموذج المستثمر بالمعلومات المطلوبة (الاسم، رقم الهاتف، العنوان، إلخ).</li>
+                        <li>حدد المبلغ الأولي للاستثمار وتاريخ بدء الاستثمار.</li>
+                        <li>انقر على زر "إضافة" لإضافة المستثمر.</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يتم إضافة عملية إيداع أو سحب؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>لإضافة عملية إيداع أو سحب، اتبع الخطوات التالية:</p>
+                    <ol>
+                        <li>انتقل إلى صفحة "العمليات" من القائمة الجانبية.</li>
+                        <li>انقر على زر "إضافة إيداع" أو "إضافة سحب" في أعلى الصفحة.</li>
+                        <li>حدد المستثمر من القائمة المنسدلة.</li>
+                        <li>أدخل المبلغ وتاريخ العملية والتفاصيل.</li>
+                        <li>انقر على زر "إضافة" لإضافة العملية.</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يتم توزيع الأرباح؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>لتوزيع الأرباح، اتبع الخطوات التالية:</p>
+                    <ol>
+                        <li>انتقل إلى صفحة "الأرباح" من القائمة الجانبية.</li>
+                        <li>ستجد قائمة بالمستثمرين وأرباحهم المتوقعة.</li>
+                        <li>انقر على زر "توزيع الربح" بجانب المستثمر المطلوب.</li>
+                        <li>تأكد من المبلغ وتاريخ التوزيع.</li>
+                        <li>انقر على زر "توزيع الربح" لتأكيد العملية.</li>
+                    </ol>
+                    <p>يمكنك أيضًا توزيع الأرباح لجميع المستثمرين دفعة واحدة من خلال الضغط على "توزيع جميع الأرباح" في أعلى الصفحة.</p>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يتم حساب الأرباح؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>يتم حساب الأرباح على النحو التالي:</p>
+                    <ul>
+                        <li>يتم حساب الربح الشهري بضرب إجمالي المبلغ المستثمر في نسبة الفائدة الشهرية (المحددة في الإعدادات).</li>
+                        <li>مثال: إذا كان المبلغ المستثمر 10,000,000 دينار ونسبة الفائدة 1.75%، فإن الربح الشهري سيكون 175,000 دينار.</li>
+                        <li>في حالة تفعيل خاصية "حساب الأرباح النسبية"، سيتم حساب الربح بناءً على عدد أيام الاستثمار في الشهر.</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <div class="card-header" style="cursor: pointer; border-radius: var(--radius-md); margin-bottom: 10px;">
+                    <div style="font-weight: 600;">كيف يمكنني عمل نسخة احتياطية للبيانات؟</div>
+                </div>
+                <div class="card-body" style="display: none; padding: 15px; background-color: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <p>لعمل نسخة احتياطية للبيانات، اتبع الخطوات التالية:</p>
+                    <ol>
+                        <li>انتقل إلى صفحة "النسخ الاحتياطي" من القائمة الجانبية.</li>
+                        <li>انقر على زر "إنشاء نسخة احتياطية" في أعلى الصفحة.</li>
+                        <li>يمكنك أيضًا تصدير البيانات بتنسيقات مختلفة (JSON، CSV، Excel) من خلال قسم "تصدير واستيراد البيانات".</li>
+                    </ol>
+                    <p>لاستعادة نسخة احتياطية، انقر على زر "استعادة" بجانب النسخة المطلوبة في قائمة النسخ الاحتياطية.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-headset"></i>
+                الدعم الفني
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                للحصول على المساعدة أو الإبلاغ عن مشكلة، يرجى التواصل مع فريق الدعم الفني عبر إحدى الطرق التالية:
+            </div>
+            
+            <div style="display: flex; flex-wrap: wrap; margin: 0 -10px;">
+                <div style="flex: 1; padding: 10px; min-width: 250px;">
+                    <div style="background-color: var(--card-bg); padding: 20px; border-radius: var(--radius-md); text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="fas fa-envelope" style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;"></i>
+                        <div style="font-weight: 600; margin-bottom: 5px;">البريد الإلكتروني</div>
+                        <div style="color: var(--text-muted);">support@example.com</div>
+                    </div>
+                </div>
+                
+                <div style="flex: 1; padding: 10px; min-width: 250px;">
+                    <div style="background-color: var(--card-bg); padding: 20px; border-radius: var(--radius-md); text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="fas fa-phone" style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;"></i>
+                        <div style="font-weight: 600; margin-bottom: 5px;">الهاتف</div>
+                        <div style="color: var(--text-muted);">+964 7XX XXX XXXX</div>
+                    </div>
+                </div>
+                
+                <div style="flex: 1; padding: 10px; min-width: 250px;">
+                    <div style="background-color: var(--card-bg); padding: 20px; border-radius: var(--radius-md); text-align: center; box-shadow: var(--shadow-sm);">
+                        <i class="fas fa-comments" style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;"></i>
+                        <div style="font-weight: 600; margin-bottom: 5px;">المحادثة المباشرة</div>
+                        <div style="color: var(--text-muted);">متاحة من 9 ص - 5 م</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <div class="form-group">
+                    <label>الموضوع</label>
+                    <input type="text" class="form-control" placeholder="أدخل عنوان المشكلة">
+                </div>
+                
+                <div class="form-group">
+                    <label>الرسالة</label>
+                    <textarea class="form-control" rows="5" placeholder="اكتب تفاصيل المشكلة هنا..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>إرفاق ملف (اختياري)</label>
+                    <input type="file" class="form-control">
+                </div>
+                
+                <button class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i>
+                    إرسال الرسالة
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<!-- Investor Modal -->
+<div class="modal-overlay" id="investor-modal-overlay">
+    <div class="modal" id="investor-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">إضافة مستثمر جديد</div>
+                <span class="close-modal" id="investor-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="investor-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>الاسم الكامل <span style="color: var(--danger-color);">*</span></label>
+                            <input type="text" class="form-control" id="investor-name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>رقم الهاتف <span style="color: var(--danger-color);">*</span></label>
+                            <input type="tel" class="form-control" id="investor-phone" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>رقم البطاقة <span style="color: var(--danger-color);">*</span></label>
+                            <input type="text" class="form-control" id="investor-id-card" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>البريد الإلكتروني</label>
+                            <input type="email" class="form-control" id="investor-email">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>العنوان</label>
+                        <input type="text" class="form-control" id="investor-address">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>المهنة</label>
+                            <input type="text" class="form-control" id="investor-job">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>المبلغ المستثمر <span style="color: var(--danger-color);">*</span></label>
+                            <input type="number" class="form-control" id="investor-amount" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>تاريخ الاستثمار <span style="color: var(--danger-color);">*</span></label>
+                        <input type="date" class="form-control" id="investor-date" required>
+                        <div id="investor-date-message" style="font-size: var(--font-xs); margin-top: 5px;"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>ملاحظات</label>
+                        <textarea class="form-control" id="investor-notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" id="investor-form-cancel">إلغاء</button>
+                <button type="submit" class="btn btn-primary" form="investor-form">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Operation Modal -->
+<div class="modal-overlay" id="operation-modal-overlay">
+    <div class="modal" id="operation-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="operation-modal-title">إضافة عملية جديدة</div>
+                <span class="close-modal" id="operation-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="operation-form">
+                    <div class="form-group">
+                        <label>نوع العملية <span style="color: var(--danger-color);">*</span></label>
+                        <select class="form-control" id="operation-type" required>
+                            <option value="deposit">إيداع</option>
+                            <option value="withdrawal">سحب</option>
+                            <option value="profit">توزيع ربح</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>المستثمر <span style="color: var(--danger-color);">*</span></label>
+                        <select class="form-control" id="operation-investor" required>
+                            <option value="">اختر المستثمر</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>المبلغ <span style="color: var(--danger-color);">*</span></label>
+                        <input type="number" class="form-control" id="operation-amount" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>تاريخ العملية <span style="color: var(--danger-color);">*</span></label>
+                        <input type="date" class="form-control" id="operation-date" required>
+                        <div id="operation-date-message" style="font-size: var(--font-xs); margin-top: 5px;"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>تفاصيل</label>
+                        <textarea class="form-control" id="operation-details" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" id="operation-form-cancel">إلغاء</button>
+                <button type="submit" class="btn btn-primary" form="operation-form">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+    // Initialize when DOM is fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sidebar toggle
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarToggle = document.querySelector('.sidebar-toggle');
+        const mainContent = document.querySelector('.main-content');
+        
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            if (window.innerWidth > 1024) {
+                mainContent.style.marginRight = sidebar.classList.contains('collapsed') ? '70px' : '280px';
+            }
+        });
+        
+        // Navigation
+        const menuItems = document.querySelectorAll('.menu-item');
+        const pages = document.querySelectorAll('.page');
+        const pageTitle = document.querySelector('.page-title');
+        
+        menuItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Ignore if it's logout button
+                if (this.id === 'logout-btn') return;
+                
+                // Update active menu item
+                menuItems.forEach(menuItem => menuItem.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Show corresponding page
+                const pageId = this.getAttribute('data-page');
+                pages.forEach(page => page.classList.remove('active'));
+                document.getElementById(pageId).classList.add('active');
+                
+                // Update page title
+                const menuSpan = this.querySelector('span');
+                const menuIcon = this.querySelector('i');
+                pageTitle.innerHTML = `<i class="${menuIcon.className}" style="color: var(--primary-color);"></i> ${menuSpan.textContent}`;
+            });
+        });
+        
+        // Modal handling
+        const investorModalOverlay = document.getElementById('investor-modal-overlay');
+        const operationModalOverlay = document.getElementById('operation-modal-overlay');
+        const addInvestorBtn = document.getElementById('add-investor-btn');
+        const addDepositBtn = document.getElementById('add-deposit-btn');
+        const addWithdrawalBtn = document.getElementById('add-withdrawal-btn');
+        const investorModalClose = document.getElementById('investor-modal-close');
+        const operationModalClose = document.getElementById('operation-modal-close');
+        const investorFormCancel = document.getElementById('investor-form-cancel');
+        const operationFormCancel = document.getElementById('operation-form-cancel');
+        
+        // Open investor modal
+        if (addInvestorBtn) {
+            addInvestorBtn.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'block';
+                document.getElementById('investor-modal').style.display = 'block';
+            });
+        }
+        
+        // Open deposit modal
+        if (addDepositBtn) {
+            addDepositBtn.addEventListener('click', function() {
+                document.getElementById('operation-type').value = 'deposit';
+                document.getElementById('operation-modal-title').textContent = 'إضافة إيداع جديد';
+                operationModalOverlay.style.display = 'block';
+                document.getElementById('operation-modal').style.display = 'block';
+            });
+        }
+        
+        // Open withdrawal modal
+        if (addWithdrawalBtn) {
+            addWithdrawalBtn.addEventListener('click', function() {
+                document.getElementById('operation-type').value = 'withdrawal';
+                document.getElementById('operation-modal-title').textContent = 'إضافة سحب جديد';
+                operationModalOverlay.style.display = 'block';
+                document.getElementById('operation-modal').style.display = 'block';
+            });
+        }
+        
+        // Close investor modal
+        if (investorModalClose) {
+            investorModalClose.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Close operation modal
+        if (operationModalClose) {
+            operationModalClose.addEventListener('click', function() {
+                operationModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Cancel investor form
+        if (investorFormCancel) {
+            investorFormCancel.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Cancel operation form
+        if (operationFormCancel) {
+            operationFormCancel.addEventListener('click', function() {
+                operationModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', function(event) {
+            if (event.target === investorModalOverlay) {
+                investorModalOverlay.style.display = 'none';
+            }
+            if (event.target === operationModalOverlay) {
+                operationModalOverlay.style.display = 'none';
+            }
+        });
+        
+        // Help page accordion
+        const faqHeaders = document.querySelectorAll('#help .card-header');
+        faqHeaders.forEach(header => {
+            header.addEventListener('click', function() {
+                const body = this.nextElementSibling;
+                
+                // Toggle current panel
+                if (body.style.display === 'block') {
+                    body.style.display = 'none';
+                } else {
+                    body.style.display = 'block';
+                }
+            });
+        });
+        
+        // Chart tabs
+        const chartTabs = document.querySelectorAll('.card-tab');
+        chartTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const chartType = this.getAttribute('data-chart');
+                if (!chartType) return;
+                
+                // Update tabs
+                const tabs = this.parentElement.querySelectorAll('.card-tab');
+                tabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Update chart (would call the actual function from app.js)
+                console.log(`Updating chart to type: ${chartType}`);
+            });
+        });
+        
+        // Notification badge (simulate unread count)
+        const updateNotificationBadge = () => {
+            const badges = document.querySelectorAll('.notification-badge, .menu-badge');
+            badges.forEach(badge => {
+                badge.textContent = '3';
+                badge.style.display = 'flex';
+            });
+        };
+        
+        updateNotificationBadge();
+        
+        // Notification panel toggle
+        const notificationBtn = document.querySelector('.notification-btn');
+        if (notificationBtn) {
+            notificationBtn.addEventListener('click', function() {
+                // This would call the function from app.js
+                console.log('Toggle notifications panel');
+            });
+        }
+        
+        // Settings save button
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        if (saveSettingsBtn) {
+            saveSettingsBtn.addEventListener('click', function() {
+                // Show success alert (simulated)
+                showAlert('تم حفظ الإعدادات بنجاح', 'success');
+            });
+        }
+        
+        // Export data button
+        const exportDataBtn = document.getElementById('export-data-btn');
+        if (exportDataBtn) {
+            exportDataBtn.addEventListener('click', function() {
+                // Show loader
+                showLoader();
+                
+                // Simulate export
+                setTimeout(() => {
+                    hideLoader();
+                    showAlert('تم تصدير البيانات بنجاح', 'success');
+                }, 1000);
+            });
+        }
+        
+        // Import data button
+        const importDataBtn = document.getElementById('import-data-btn');
+        if (importDataBtn) {
+            importDataBtn.addEventListener('click', function() {
+                const fileInput = document.getElementById('import-data-file');
+                if (!fileInput.files.length) {
+                    showAlert('يرجى اختيار ملف', 'warning');
+                    return;
+                }
+                
+                // Confirm import
+                if (confirm('سيؤدي استيراد البيانات إلى استبدال البيانات الحالية. هل تريد المتابعة؟')) {
+                    // Show loader
+                    showLoader();
+                    
+                    // Simulate import
+                    setTimeout(() => {
+                        hideLoader();
+                        showAlert('تم استيراد البيانات بنجاح', 'success');
+                    }, 2000);
+                }
+            });
+        }
+        
+        // Report generation
+        const generateReportBtn = document.getElementById('generate-report-btn');
+        if (generateReportBtn) {
+            generateReportBtn.addEventListener('click', function() {
+                const fromDate = document.getElementById('report-from').value;
+                const toDate = document.getElementById('report-to').value;
+                
+                if (!fromDate || !toDate) {
+                    showAlert('يرجى تحديد فترة التقرير', 'warning');
+                    return;
+                }
+                
+                // Show loader
+                showLoader();
+                
+                // Simulate report generation
+                setTimeout(() => {
+                    hideLoader();
+                    
+                    // Add a sample report result
+                    const reportResults = document.getElementById('report-results');
+                    reportResults.innerHTML = `
+                        <div class="card card-gradient-border" style="margin-top: 20px;">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-file-alt"></i>
+                                    نتيجة التقرير
+                                </div>
+                                <button class="btn btn-outline-primary btn-round print-report-btn">
+                                    <i class="fas fa-print"></i>
+                                    طباعة التقرير
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <h3>تقرير ملخص (${formatDate(fromDate)} - ${formatDate(toDate)})</h3>
+                                <div style="display: flex; flex-wrap: wrap; margin: 20px 0;">
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--primary-color);">0</div>
+                                        <div>إجمالي المستثمرين</div>
+                                    </div>
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--success-color);">0 د.ع</div>
+                                        <div>إجمالي الاستثمارات</div>
+                                    </div>
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--warning-color);">0 د.ع</div>
+                                        <div>إجمالي الأرباح</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    لا توجد بيانات كافية في الفترة المحددة.
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add print functionality
+                    const printBtn = document.querySelector('.print-report-btn');
+                    if (printBtn) {
+                        printBtn.addEventListener('click', function() {
+                            window.print();
+                        });
+                    }
+                }, 1500);
+            });
+        }
+        
+        // Initialize date inputs with today's date
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        const today = new Date().toISOString().split('T')[0];
+        dateInputs.forEach(input => {
+            input.value = today;
+        });
+        
+        // Theme toggle (simulation)
+        document.getElementById('theme').addEventListener('change', function() {
+            document.body.classList.toggle('theme-dark');
+        });
+        
+        // Font size toggle (simulation)
+        document.getElementById('font-size').addEventListener('change', function() {
+            document.body.classList.remove('font-small', 'font-medium', 'font-large');
+            document.body.classList.add(`font-${this.value}`);
+        });
+    });
+    
+    // Helper functions
+    function showLoader() {
+        const loaderOverlay = document.querySelector('.loader-overlay');
+        if (loaderOverlay) {
+            loaderOverlay.style.display = 'flex';
+        }
+    }
+    
+    function hideLoader() {
+        const loaderOverlay = document.querySelector('.loader-overlay');
+        if (loaderOverlay) {
+            loaderOverlay.style.display = 'none';
+        }
+    }
+    
+    function showAlert(message, type = 'info') {
+        // Create alert element
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type}`;
+        alert.style.position = 'fixed';
+        alert.style.top = '20px';
+        alert.style.left = '50%';
+        alert.style.transform = 'translateX(-50%)';
+        alert.style.zIndex = '9999';
+        alert.style.minWidth = '300px';
+        alert.style.textAlign = 'center';
+        alert.style.boxShadow = 'var(--shadow-lg)';
+        alert.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            ${message}
+        `;
+        
+        // Add to body
+        document.body.appendChild(alert);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            alert.style.opacity = '0';
+            alert.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => {
+                document.body.removeChild(alert);
+            }, 500);
+        }, 3000);
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    }
+</script>
+
+<!-- استدعاء ملف JavaScript الأصلي -->
+<script src="app.js"></script>
+
+</body>
+</html>
