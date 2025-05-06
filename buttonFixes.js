@@ -1439,3 +1439,359 @@ setInterval(() => {
         fixProfitsTableActionButtons();
     }
 }, 5000);
+
+
+    // Initialize when DOM is fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sidebar toggle
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarToggle = document.querySelector('.sidebar-toggle');
+        const mainContent = document.querySelector('.main-content');
+        
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            if (window.innerWidth > 1024) {
+                mainContent.style.marginRight = sidebar.classList.contains('collapsed') ? '70px' : '280px';
+            }
+        });
+        
+        // Navigation
+        const menuItems = document.querySelectorAll('.menu-item');
+        const pages = document.querySelectorAll('.page');
+        const pageTitle = document.querySelector('.page-title');
+        
+        menuItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Ignore if it's logout button
+                if (this.id === 'logout-btn') return;
+                
+                // Update active menu item
+                menuItems.forEach(menuItem => menuItem.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Show corresponding page
+                const pageId = this.getAttribute('data-page');
+                pages.forEach(page => page.classList.remove('active'));
+                document.getElementById(pageId).classList.add('active');
+                
+                // Update page title
+                const menuSpan = this.querySelector('span');
+                const menuIcon = this.querySelector('i');
+                pageTitle.innerHTML = `<i class="${menuIcon.className}" style="color: var(--primary-color);"></i> ${menuSpan.textContent}`;
+            });
+        });
+        
+        // Modal handling
+        const investorModalOverlay = document.getElementById('investor-modal-overlay');
+        const operationModalOverlay = document.getElementById('operation-modal-overlay');
+        const addInvestorBtn = document.getElementById('add-investor-btn');
+        const addDepositBtn = document.getElementById('add-deposit-btn');
+        const addWithdrawalBtn = document.getElementById('add-withdrawal-btn');
+        const investorModalClose = document.getElementById('investor-modal-close');
+        const operationModalClose = document.getElementById('operation-modal-close');
+        const investorFormCancel = document.getElementById('investor-form-cancel');
+        const operationFormCancel = document.getElementById('operation-form-cancel');
+        
+        // Open investor modal
+        if (addInvestorBtn) {
+            addInvestorBtn.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'block';
+                document.getElementById('investor-modal').style.display = 'block';
+            });
+        }
+        
+        // Open deposit modal
+        if (addDepositBtn) {
+            addDepositBtn.addEventListener('click', function() {
+                document.getElementById('operation-type').value = 'deposit';
+                document.getElementById('operation-modal-title').textContent = 'إضافة إيداع جديد';
+                operationModalOverlay.style.display = 'block';
+                document.getElementById('operation-modal').style.display = 'block';
+            });
+        }
+        
+        // Open withdrawal modal
+        if (addWithdrawalBtn) {
+            addWithdrawalBtn.addEventListener('click', function() {
+                document.getElementById('operation-type').value = 'withdrawal';
+                document.getElementById('operation-modal-title').textContent = 'إضافة سحب جديد';
+                operationModalOverlay.style.display = 'block';
+                document.getElementById('operation-modal').style.display = 'block';
+            });
+        }
+        
+        // Close investor modal
+        if (investorModalClose) {
+            investorModalClose.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Close operation modal
+        if (operationModalClose) {
+            operationModalClose.addEventListener('click', function() {
+                operationModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Cancel investor form
+        if (investorFormCancel) {
+            investorFormCancel.addEventListener('click', function() {
+                investorModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Cancel operation form
+        if (operationFormCancel) {
+            operationFormCancel.addEventListener('click', function() {
+                operationModalOverlay.style.display = 'none';
+            });
+        }
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', function(event) {
+            if (event.target === investorModalOverlay) {
+                investorModalOverlay.style.display = 'none';
+            }
+            if (event.target === operationModalOverlay) {
+                operationModalOverlay.style.display = 'none';
+            }
+        });
+        
+        // Help page accordion
+        const faqHeaders = document.querySelectorAll('#help .card-header');
+        faqHeaders.forEach(header => {
+            header.addEventListener('click', function() {
+                const body = this.nextElementSibling;
+                
+                // Toggle current panel
+                if (body.style.display === 'block') {
+                    body.style.display = 'none';
+                } else {
+                    body.style.display = 'block';
+                }
+            });
+        });
+        
+        // Chart tabs
+        const chartTabs = document.querySelectorAll('.card-tab');
+        chartTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const chartType = this.getAttribute('data-chart');
+                if (!chartType) return;
+                
+                // Update tabs
+                const tabs = this.parentElement.querySelectorAll('.card-tab');
+                tabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Update chart (would call the actual function from app.js)
+                console.log(`Updating chart to type: ${chartType}`);
+            });
+        });
+        
+        // Notification badge (simulate unread count)
+        const updateNotificationBadge = () => {
+            const badges = document.querySelectorAll('.notification-badge, .menu-badge');
+            badges.forEach(badge => {
+                badge.textContent = '3';
+                badge.style.display = 'flex';
+            });
+        };
+        
+        updateNotificationBadge();
+        
+        // Notification panel toggle
+        const notificationBtn = document.querySelector('.notification-btn');
+        if (notificationBtn) {
+            notificationBtn.addEventListener('click', function() {
+                // This would call the function from app.js
+                console.log('Toggle notifications panel');
+            });
+        }
+        
+        // Settings save button
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        if (saveSettingsBtn) {
+            saveSettingsBtn.addEventListener('click', function() {
+                // Show success alert (simulated)
+                showAlert('تم حفظ الإعدادات بنجاح', 'success');
+            });
+        }
+        
+        // Export data button
+        const exportDataBtn = document.getElementById('export-data-btn');
+        if (exportDataBtn) {
+            exportDataBtn.addEventListener('click', function() {
+                // Show loader
+                showLoader();
+                
+                // Simulate export
+                setTimeout(() => {
+                    hideLoader();
+                    showAlert('تم تصدير البيانات بنجاح', 'success');
+                }, 1000);
+            });
+        }
+        
+        // Import data button
+        const importDataBtn = document.getElementById('import-data-btn');
+        if (importDataBtn) {
+            importDataBtn.addEventListener('click', function() {
+                const fileInput = document.getElementById('import-data-file');
+                if (!fileInput.files.length) {
+                    showAlert('يرجى اختيار ملف', 'warning');
+                    return;
+                }
+                
+                // Confirm import
+                if (confirm('سيؤدي استيراد البيانات إلى استبدال البيانات الحالية. هل تريد المتابعة؟')) {
+                    // Show loader
+                    showLoader();
+                    
+                    // Simulate import
+                    setTimeout(() => {
+                        hideLoader();
+                        showAlert('تم استيراد البيانات بنجاح', 'success');
+                    }, 2000);
+                }
+            });
+        }
+        
+        // Report generation
+        const generateReportBtn = document.getElementById('generate-report-btn');
+        if (generateReportBtn) {
+            generateReportBtn.addEventListener('click', function() {
+                const fromDate = document.getElementById('report-from').value;
+                const toDate = document.getElementById('report-to').value;
+                
+                if (!fromDate || !toDate) {
+                    showAlert('يرجى تحديد فترة التقرير', 'warning');
+                    return;
+                }
+                
+                // Show loader
+                showLoader();
+                
+                // Simulate report generation
+                setTimeout(() => {
+                    hideLoader();
+                    
+                    // Add a sample report result
+                    const reportResults = document.getElementById('report-results');
+                    reportResults.innerHTML = `
+                        <div class="card card-gradient-border" style="margin-top: 20px;">
+                            <div class="card-header">
+                                <div class="card-title">
+                                    <i class="fas fa-file-alt"></i>
+                                    نتيجة التقرير
+                                </div>
+                                <button class="btn btn-outline-primary btn-round print-report-btn">
+                                    <i class="fas fa-print"></i>
+                                    طباعة التقرير
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <h3>تقرير ملخص (${formatDate(fromDate)} - ${formatDate(toDate)})</h3>
+                                <div style="display: flex; flex-wrap: wrap; margin: 20px 0;">
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--primary-color);">0</div>
+                                        <div>إجمالي المستثمرين</div>
+                                    </div>
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--success-color);">0 د.ع</div>
+                                        <div>إجمالي الاستثمارات</div>
+                                    </div>
+                                    <div style="flex: 1; min-width: 200px; padding: 15px; text-align: center; background-color: var(--card-bg); margin: 5px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                                        <div style="font-size: var(--font-xl); font-weight: 700; color: var(--warning-color);">0 د.ع</div>
+                                        <div>إجمالي الأرباح</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    لا توجد بيانات كافية في الفترة المحددة.
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add print functionality
+                    const printBtn = document.querySelector('.print-report-btn');
+                    if (printBtn) {
+                        printBtn.addEventListener('click', function() {
+                            window.print();
+                        });
+                    }
+                }, 1500);
+            });
+        }
+        
+        // Initialize date inputs with today's date
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        const today = new Date().toISOString().split('T')[0];
+        dateInputs.forEach(input => {
+            input.value = today;
+        });
+        
+        // Theme toggle (simulation)
+        document.getElementById('theme').addEventListener('change', function() {
+            document.body.classList.toggle('theme-dark');
+        });
+        
+        // Font size toggle (simulation)
+        document.getElementById('font-size').addEventListener('change', function() {
+            document.body.classList.remove('font-small', 'font-medium', 'font-large');
+            document.body.classList.add(`font-${this.value}`);
+        });
+    });
+    
+    // Helper functions
+    function showLoader() {
+        const loaderOverlay = document.querySelector('.loader-overlay');
+        if (loaderOverlay) {
+            loaderOverlay.style.display = 'flex';
+        }
+    }
+    
+    function hideLoader() {
+        const loaderOverlay = document.querySelector('.loader-overlay');
+        if (loaderOverlay) {
+            loaderOverlay.style.display = 'none';
+        }
+    }
+    
+    function showAlert(message, type = 'info') {
+        // Create alert element
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type}`;
+        alert.style.position = 'fixed';
+        alert.style.top = '20px';
+        alert.style.left = '50%';
+        alert.style.transform = 'translateX(-50%)';
+        alert.style.zIndex = '9999';
+        alert.style.minWidth = '300px';
+        alert.style.textAlign = 'center';
+        alert.style.boxShadow = 'var(--shadow-lg)';
+        alert.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            ${message}
+        `;
+        
+        // Add to body
+        document.body.appendChild(alert);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            alert.style.opacity = '0';
+            alert.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => {
+                document.body.removeChild(alert);
+            }, 500);
+        }, 3000);
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    }
