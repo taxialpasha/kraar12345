@@ -1,1588 +1,2006 @@
 /**
- * firebase-integration.js
- * مكتبة تكامل نظام إدارة الاستثمار مع Firebase
+ * Firebase Integration
  * 
- * هذا الملف يوفر وظائف التكامل مع Firebase لـ:
- * - تخزين ومزامنة البيانات
- * - النسخ الاحتياطي
- * - تسجيل الأنشطة
- * - استعادة البيانات المحذوفة
+ * هذا الملف يقوم بتكامل النظام مع Firebase ويعالج مشاكل التخزين المحلي
+ * ويضيف الوظائف الناقصة في التطبيق
  */
 
-// تهيئة Firebase
-firebase.initializeApp(firebaseConfig);
-
-// الوصول إلى خدمات Firebase
-const auth = firebase.auth();
-const db = firebase.database();
-const storage = firebase.storage();
-
-// حالة المزامنة
-let syncEnabled = false;
-let lastSyncTime = null;
-let currentUser = null;
-let syncInterval = null;
-
-// تهيئة وضع المزامنة
-function initializeFirebaseSync() {
-    // التحقق من حالة المزامنة المحفوظة مسبقًا
-    syncEnabled = localStorage.getItem('syncEnabled') === 'true';
-    lastSyncTime = localStorage.getItem('lastSyncTime');
+// تهيئة عناصر النظام عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    // تحميل البيانات من التخزين المحلي
+    loadData();
     
-    // تحديث أيقونة المزامنة
-    updateSyncIcon();
+    // تحديث لوحة التحكم
+    updateDashboard();
     
-    // إذا كانت المزامنة مفعلة، ابدأ بالمزامنة التلقائية
-    if (syncEnabled) {
-        startAutoSync();
-    }
+    // إضافة مستمعي الأحداث
+    addEventListeners();
     
-    // إضافة مستمع للتغييرات في البيانات المحلية
-    window.addEventListener('storage-changed', handleLocalDataChange);
-}
-
-// تسجيل الدخول
-async function signIn(email, password) {
-    try {
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        currentUser = userCredential.user;
-        
-        // تحديث واجهة المستخدم
-        document.getElementById('syncStatus').textContent = 'متصل: ' + email;
-        
-        // مزامنة البيانات من Firebase
-        await pullDataFromFirebase();
-        
-        // تفعيل المزامنة التلقائية
-        enableSync();
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في تسجيل الدخول:', error);
-        return false;
-    }
-}
-
-// إنشاء حساب جديد
-async function createAccount(email, password, companyName) {
-    try {
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        currentUser = userCredential.user;
-        
-        // إنشاء ملف تعريف للمستخدم
-        await db.ref('users/' + currentUser.uid).set({
-            email: email,
-            companyName: companyName,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
-        });
-        
-        // تحديث واجهة المستخدم
-        document.getElementById('syncStatus').textContent = 'متصل: ' + email;
-        
-        // دفع البيانات الحالية إلى Firebase
-        await pushDataToFirebase();
-        
-        // تفعيل المزامنة التلقائية
-        enableSync();
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في إنشاء الحساب:', error);
-        return false;
-    }
-}
-
-// تسجيل الخروج
-async function signOut() {
-    try {
-        // إيقاف المزامنة التلقائية
-        disableSync();
-        
-        await auth.signOut();
-        currentUser = null;
-        
-        // تحديث واجهة المستخدم
-        document.getElementById('syncStatus').textContent = 'غير متصل';
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في تسجيل الخروج:', error);
-        return false;
-    }
-}
-
-// تفعيل المزامنة
-function enableSync() {
-    syncEnabled = true;
-    localStorage.setItem('syncEnabled', 'true');
-    updateSyncIcon();
-    startAutoSync();
+    // تعيين التاريخ الافتراضي في نماذج الإدخال
+    setDefaultDates();
     
-    // تسجيل حدث بدء المزامنة
-    logActivity('system', 'بدء المزامنة مع Firebase');
-}
-
-// تعطيل المزامنة
-function disableSync() {
-    syncEnabled = false;
-    localStorage.setItem('syncEnabled', 'false');
-    updateSyncIcon();
-    stopAutoSync();
+    // إعداد تكامل Firebase
+    setupFirebaseApp();
     
-    // تسجيل حدث إيقاف المزامنة
-    logActivity('system', 'إيقاف المزامنة مع Firebase');
-}
-
-// بدء المزامنة التلقائية
-function startAutoSync() {
-    if (syncInterval) {
-        clearInterval(syncInterval);
-    }
+    // تحديث حالة المزامنة
+    updateSyncSettingsStatus();
     
-    // مزامنة البيانات كل 5 دقائق
-    syncInterval = setInterval(async () => {
-        if (syncEnabled && currentUser) {
-            await syncData();
-        }
-    }, 5 * 60 * 1000);
+    // جدولة عمليات النسخ الاحتياطي التلقائي
+    scheduleAutoBackup();
     
-    // مزامنة فورية
-    syncData();
-}
-
-// إيقاف المزامنة التلقائية
-function stopAutoSync() {
-    if (syncInterval) {
-        clearInterval(syncInterval);
-        syncInterval = null;
-    }
-}
-
-// تحديث أيقونة المزامنة
-function updateSyncIcon() {
-    const syncIcon = document.getElementById('syncIcon');
+    // إضافة مستمع للتنقل بين الصفحات
+    addPageNavigationListener();
     
-    if (!syncIcon) return;
+    // تحميل التقويم
+    loadCalendar();
     
-    if (syncEnabled) {
-        syncIcon.innerHTML = '<i class="fas fa-sync"></i>';
-        syncIcon.classList.add('active');
-    } else {
-        syncIcon.innerHTML = '<i class="fas fa-cloud"></i>';
-        syncIcon.classList.remove('active');
-    }
+    // تحميل الإشعارات
+    loadNotifications();
     
-    // إضافة النص الخاص بآخر مزامنة
-    let syncStatusText = '';
-    
-    if (lastSyncTime) {
-        const lastSync = new Date(parseInt(lastSyncTime));
-        syncStatusText = 'آخر مزامنة: ' + lastSync.toLocaleString('ar-IQ');
-    }
-    
-    document.getElementById('lastSyncTime').textContent = syncStatusText;
-}
-
-// معالجة تغييرات البيانات المحلية
-function handleLocalDataChange(event) {
-    if (!syncEnabled || !currentUser) return;
-    
-    // جدولة مزامنة بعد 2 ثانية من آخر تغيير
-    clearTimeout(window.syncTimeout);
-    window.syncTimeout = setTimeout(() => {
-        pushDataToFirebase();
-    }, 2000);
-}
-
-// مزامنة البيانات
-async function syncData() {
-    if (!currentUser) return;
-    
-    try {
-        // التحقق من آخر مزامنة على Firebase
-        const lastServerSync = await db.ref('users/' + currentUser.uid + '/lastSync').once('value');
-        const serverSyncTime = lastServerSync.val();
-        
-        if (serverSyncTime && (!lastSyncTime || serverSyncTime > parseInt(lastSyncTime))) {
-            // البيانات على السيرفر أحدث، قم بالسحب
-            await pullDataFromFirebase();
-        } else {
-            // البيانات المحلية أحدث، قم بالدفع
-            await pushDataToFirebase();
-        }
-        
-        // تحديث وقت آخر مزامنة
-        lastSyncTime = Date.now().toString();
-        localStorage.setItem('lastSyncTime', lastSyncTime);
-        
-        // تحديث أيقونة المزامنة
-        updateSyncIcon();
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في مزامنة البيانات:', error);
-        return false;
-    }
-}
-
-// دفع البيانات إلى Firebase
-async function pushDataToFirebase() {
-    if (!currentUser) return;
-    
-    try {
-        // الحصول على البيانات المحلية
-        const investors = JSON.parse(localStorage.getItem('investors')) || [];
-        const investments = JSON.parse(localStorage.getItem('investments')) || [];
-        const operations = JSON.parse(localStorage.getItem('operations')) || [];
-        const settings = JSON.parse(localStorage.getItem('settings')) || {};
-        
-        // حفظ البيانات في Firebase
-        await db.ref('users/' + currentUser.uid + '/data').set({
-            investors,
-            investments,
-            operations,
-            settings
-        });
-        
-        // تحديث وقت آخر مزامنة
-        await db.ref('users/' + currentUser.uid + '/lastSync').set(firebase.database.ServerValue.TIMESTAMP);
-        
-        // تحديث وقت المزامنة المحلي
-        lastSyncTime = Date.now().toString();
-        localStorage.setItem('lastSyncTime', lastSyncTime);
-        
-        // تحديث أيقونة المزامنة
-        updateSyncIcon();
-        
-        // تسجيل نشاط المزامنة
-        logActivity('system', 'تم دفع البيانات إلى Firebase');
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في دفع البيانات إلى Firebase:', error);
-        return false;
-    }
-}
-
-// سحب البيانات من Firebase
-async function pullDataFromFirebase() {
-    if (!currentUser) return;
-    
-    try {
-        // جلب البيانات من Firebase
-        const dataSnapshot = await db.ref('users/' + currentUser.uid + '/data').once('value');
-        const firebaseData = dataSnapshot.val();
-        
-        if (firebaseData) {
-            // حفظ البيانات محليًا
-            if (firebaseData.investors) localStorage.setItem('investors', JSON.stringify(firebaseData.investors));
-            if (firebaseData.investments) localStorage.setItem('investments', JSON.stringify(firebaseData.investments));
-            if (firebaseData.operations) localStorage.setItem('operations', JSON.stringify(firebaseData.operations));
-            if (firebaseData.settings) localStorage.setItem('settings', JSON.stringify(firebaseData.settings));
-            
-            // تحديث وقت آخر مزامنة
-            lastSyncTime = Date.now().toString();
-            localStorage.setItem('lastSyncTime', lastSyncTime);
-            
-            // إشعار التطبيق بتحديث البيانات
-            window.dispatchEvent(new CustomEvent('data-updated'));
-            
-            // تحديث واجهة المستخدم
-            updateSyncIcon();
-            
-            // إعادة تحميل الصفحة الحالية
-            const currentPage = document.querySelector('.page.active').id;
-            window.showPage(currentPage);
-        }
-        
-        // تسجيل نشاط المزامنة
-        logActivity('system', 'تم سحب البيانات من Firebase');
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في سحب البيانات من Firebase:', error);
-        return false;
-    }
-}
-
-// إنشاء نسخة احتياطية في Firebase
-async function createFirebaseBackup(name = '') {
-    if (!currentUser) return false;
-    
-    try {
-        // الحصول على البيانات المحلية
-        const investors = JSON.parse(localStorage.getItem('investors')) || [];
-        const investments = JSON.parse(localStorage.getItem('investments')) || [];
-        const operations = JSON.parse(localStorage.getItem('operations')) || [];
-        const settings = JSON.parse(localStorage.getItem('settings')) || {};
-        
-        // اسم النسخة الاحتياطية
-        const backupDate = new Date();
-        const backupName = name || `backup_${backupDate.toISOString().slice(0, 10)}`;
-        
-        // حفظ النسخة الاحتياطية في Firebase
-        await db.ref('users/' + currentUser.uid + '/backups/' + backupName).set({
-            investors,
-            investments,
-            operations,
-            settings,
-            createdAt: firebase.database.ServerValue.TIMESTAMP,
-            backupName: backupName
-        });
-        
-        // تسجيل نشاط النسخ الاحتياطي
-        logActivity('system', 'تم إنشاء نسخة احتياطية: ' + backupName);
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في إنشاء نسخة احتياطية:', error);
-        return false;
-    }
-}
-
-// الحصول على قائمة النسخ الاحتياطية
-async function getBackupsList() {
-    if (!currentUser) return [];
-    
-    try {
-        const backupsSnapshot = await db.ref('users/' + currentUser.uid + '/backups').once('value');
-        const backups = backupsSnapshot.val() || {};
-        
-        // تحويل البيانات إلى مصفوفة
-        return Object.keys(backups).map(key => ({
-            id: key,
-            name: backups[key].backupName || key,
-            createdAt: backups[key].createdAt,
-            date: new Date(backups[key].createdAt).toLocaleString('ar-IQ')
-        })).sort((a, b) => b.createdAt - a.createdAt);
-    } catch (error) {
-        console.error('خطأ في جلب قائمة النسخ الاحتياطية:', error);
-        return [];
-    }
-}
-
-// استعادة نسخة احتياطية من Firebase
-async function restoreBackup(backupId) {
-    if (!currentUser) return false;
-    
-    try {
-        // جلب النسخة الاحتياطية من Firebase
-        const backupSnapshot = await db.ref('users/' + currentUser.uid + '/backups/' + backupId).once('value');
-        const backup = backupSnapshot.val();
-        
-        if (backup) {
-            // حفظ البيانات محليًا
-            if (backup.investors) localStorage.setItem('investors', JSON.stringify(backup.investors));
-            if (backup.investments) localStorage.setItem('investments', JSON.stringify(backup.investments));
-            if (backup.operations) localStorage.setItem('operations', JSON.stringify(backup.operations));
-            if (backup.settings) localStorage.setItem('settings', JSON.stringify(backup.settings));
-            
-            // إشعار التطبيق بتحديث البيانات
-            window.dispatchEvent(new CustomEvent('data-updated'));
-            
-            // إعادة تحميل الصفحة الحالية
-            const currentPage = document.querySelector('.page.active').id;
-            window.showPage(currentPage);
-            
-            // تسجيل نشاط استعادة النسخة الاحتياطية
-            logActivity('system', 'تم استعادة نسخة احتياطية: ' + (backup.backupName || backupId));
-            
-            // مزامنة البيانات مع Firebase
-            await pushDataToFirebase();
-            
-            return true;
-        }
-        
-        return false;
-    } catch (error) {
-        console.error('خطأ في استعادة النسخة الاحتياطية:', error);
-        return false;
-    }
-}
-
-// حذف نسخة احتياطية من Firebase
-async function deleteBackup(backupId) {
-    if (!currentUser) return false;
-    
-    try {
-        // حذف النسخة الاحتياطية من Firebase
-        await db.ref('users/' + currentUser.uid + '/backups/' + backupId).remove();
-        
-        // تسجيل نشاط حذف النسخة الاحتياطية
-        logActivity('system', 'تم حذف نسخة احتياطية: ' + backupId);
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في حذف النسخة الاحتياطية:', error);
-        return false;
-    }
-}
-
-// أرشفة مستثمر قبل الحذف
-async function archiveInvestor(investorId) {
-    if (!currentUser) return false;
-    
-    try {
-        // البحث عن المستثمر
-        const investors = JSON.parse(localStorage.getItem('investors')) || [];
-        const investorIndex = investors.findIndex(investor => investor.id === investorId);
-        
-        if (investorIndex === -1) return false;
-        
-        const investor = investors[investorIndex];
-        
-        // البحث عن استثمارات المستثمر
-        const investments = JSON.parse(localStorage.getItem('investments')) || [];
-        const investorInvestments = investments.filter(investment => investment.investorId === investorId);
-        
-        // البحث عن عمليات المستثمر
-        const operations = JSON.parse(localStorage.getItem('operations')) || [];
-        const investorOperations = operations.filter(operation => operation.investorId === investorId);
-        
-        // حفظ بيانات المستثمر في أرشيف Firebase
-        await db.ref('users/' + currentUser.uid + '/archives/investors/' + investorId).set({
-            investor,
-            investments: investorInvestments,
-            operations: investorOperations,
-            archivedAt: firebase.database.ServerValue.TIMESTAMP
-        });
-        
-        // تسجيل نشاط أرشفة المستثمر
-        logActivity('investor', 'تم أرشفة المستثمر: ' + investor.name, investorId);
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في أرشفة المستثمر:', error);
-        return false;
-    }
-}
-
-// استعادة مستثمر من الأرشيف
-async function restoreInvestor(investorId) {
-    if (!currentUser) return false;
-    
-    try {
-        // جلب بيانات المستثمر من الأرشيف
-        const archiveSnapshot = await db.ref('users/' + currentUser.uid + '/archives/investors/' + investorId).once('value');
-        const archive = archiveSnapshot.val();
-        
-        if (!archive) return false;
-        
-        // استعادة بيانات المستثمر
-        const investors = JSON.parse(localStorage.getItem('investors')) || [];
-        const investments = JSON.parse(localStorage.getItem('investments')) || [];
-        const operations = JSON.parse(localStorage.getItem('operations')) || [];
-        
-        // التحقق من عدم وجود المستثمر حاليًا
-        if (!investors.some(investor => investor.id === investorId)) {
-            investors.push(archive.investor);
-        }
-        
-        // إضافة استثمارات المستثمر غير الموجودة
-        if (archive.investments) {
-            archive.investments.forEach(investment => {
-                if (!investments.some(inv => inv.id === investment.id)) {
-                    investments.push(investment);
-                }
-            });
-        }
-        
-        // إضافة عمليات المستثمر غير الموجودة
-        if (archive.operations) {
-            archive.operations.forEach(operation => {
-                if (!operations.some(op => op.id === operation.id)) {
-                    operations.push(operation);
-                }
-            });
-        }
-        
-        // حفظ البيانات المحدثة
-        localStorage.setItem('investors', JSON.stringify(investors));
-        localStorage.setItem('investments', JSON.stringify(investments));
-        localStorage.setItem('operations', JSON.stringify(operations));
-        
-        // إشعار التطبيق بتحديث البيانات
-        window.dispatchEvent(new CustomEvent('data-updated'));
-        
-        // تسجيل نشاط استعادة المستثمر
-        logActivity('investor', 'تم استعادة المستثمر: ' + archive.investor.name, investorId);
-        
-        // مزامنة البيانات مع Firebase
-        await pushDataToFirebase();
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ في استعادة المستثمر:', error);
-        return false;
-    }
-}
-
-// الحصول على قائمة المستثمرين المؤرشفين
-async function getArchivedInvestors() {
-    if (!currentUser) return [];
-    
-    try {
-        const archivesSnapshot = await db.ref('users/' + currentUser.uid + '/archives/investors').once('value');
-        const archives = archivesSnapshot.val() || {};
-        
-        // تحويل البيانات إلى مصفوفة
-        return Object.keys(archives).map(key => ({
-            id: key,
-            investor: archives[key].investor,
-            archivedAt: archives[key].archivedAt,
-            date: new Date(archives[key].archivedAt).toLocaleString('ar-IQ')
-        })).sort((a, b) => b.archivedAt - a.archivedAt);
-    } catch (error) {
-        console.error('خطأ في جلب قائمة المستثمرين المؤرشفين:', error);
-        return [];
-    }
-}
-
-// تسجيل نشاط في Firebase
-async function logActivity(type, description, relatedId = null) {
-    if (!currentUser) return;
-    
-    try {
-        // إنشاء سجل النشاط
-        const activityLog = {
-            type,
-            description,
-            timestamp: firebase.database.ServerValue.TIMESTAMP,
-            userId: currentUser.uid,
-            userEmail: currentUser.email,
-            relatedId
-        };
-        
-        // حفظ النشاط في Firebase
-        await db.ref('users/' + currentUser.uid + '/activities').push(activityLog);
-        
-        // إذا كانت المزامنة مفعلة، قم بحفظ الأنشطة محليًا أيضًا
-        if (syncEnabled) {
-            const activities = JSON.parse(localStorage.getItem('activities')) || [];
-            activities.push({
-                ...activityLog,
-                timestamp: Date.now(),
-                id: generateId()
-            });
-            
-            // الاحتفاظ بآخر 100 نشاط فقط
-            if (activities.length > 100) {
-                activities.splice(0, activities.length - 100);
-            }
-            
-            localStorage.setItem('activities', JSON.stringify(activities));
-        }
-    } catch (error) {
-        console.error('خطأ في تسجيل النشاط:', error);
-    }
-}
-
-// الحصول على سجل الأنشطة
-async function getActivities(limit = 50) {
-    if (!currentUser) return [];
-    
-    try {
-        const activitiesSnapshot = await db.ref('users/' + currentUser.uid + '/activities')
-            .orderByChild('timestamp')
-            .limitToLast(limit)
-            .once('value');
-            
-        const activities = activitiesSnapshot.val() || {};
-        
-        // تحويل البيانات إلى مصفوفة
-        return Object.keys(activities).map(key => ({
-            id: key,
-            ...activities[key],
-            date: new Date(activities[key].timestamp).toLocaleString('ar-IQ')
-        })).sort((a, b) => b.timestamp - a.timestamp);
-    } catch (error) {
-        console.error('خطأ في جلب سجل الأنشطة:', error);
-        return [];
-    }
-}
-
-// إنشاء معرف فريد
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2);
-}
-
-// إظهار مربع حوار تسجيل الدخول
-function showLoginDialog() {
-    // إنشاء مربع حوار تسجيل الدخول
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay active';
-    modal.id = 'loginModal';
-    
-    modal.innerHTML = `
-        <div class="modal">
-            <div class="modal-header">
-                <h2 class="modal-title">تسجيل الدخول إلى Firebase</h2>
-                <div class="modal-close" onclick="document.getElementById('loginModal').remove()">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div class="tabs">
-                    <div class="tab active" onclick="switchLoginTab('login')">تسجيل الدخول</div>
-                    <div class="tab" onclick="switchLoginTab('register')">إنشاء حساب</div>
-                </div>
-                
-                <div id="loginTab" class="login-tab active">
-                    <form id="loginForm">
-                        <div class="form-group">
-                            <label class="form-label">البريد الإلكتروني</label>
-                            <input type="email" class="form-control" id="loginEmail" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">كلمة المرور</label>
-                            <input type="password" class="form-control" id="loginPassword" required>
-                        </div>
-                    </form>
-                </div>
-                
-                <div id="registerTab" class="login-tab">
-                    <form id="registerForm">
-                        <div class="form-group">
-                            <label class="form-label">البريد الإلكتروني</label>
-                            <input type="email" class="form-control" id="registerEmail" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">كلمة المرور</label>
-                            <input type="password" class="form-control" id="registerPassword" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">اسم الشركة</label>
-                            <input type="text" class="form-control" id="companyName" required>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-light" onclick="document.getElementById('loginModal').remove()">إلغاء</button>
-                <button id="loginButton" class="btn btn-primary" onclick="handleLogin()">تسجيل الدخول</button>
-                <button id="registerButton" class="btn btn-primary" style="display: none;" onclick="handleRegister()">إنشاء حساب</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-}
-
-// تبديل تبويبات تسجيل الدخول
-function switchLoginTab(tab) {
-    const loginTab = document.getElementById('loginTab');
-    const registerTab = document.getElementById('registerTab');
-    const loginButton = document.getElementById('loginButton');
-    const registerButton = document.getElementById('registerButton');
-    
-    if (tab === 'login') {
-        loginTab.classList.add('active');
-        registerTab.classList.remove('active');
-        loginButton.style.display = 'block';
-        registerButton.style.display = 'none';
-        
-        // تحديث التبويب النشط
-        document.querySelector('.tabs .tab:nth-child(1)').classList.add('active');
-        document.querySelector('.tabs .tab:nth-child(2)').classList.remove('active');
-    } else {
-        loginTab.classList.remove('active');
-        registerTab.classList.add('active');
-        loginButton.style.display = 'none';
-        registerButton.style.display = 'block';
-        
-        // تحديث التبويب النشط
-        document.querySelector('.tabs .tab:nth-child(1)').classList.remove('active');
-        document.querySelector('.tabs .tab:nth-child(2)').classList.add('active');
-    }
-}
-
-// معالجة تسجيل الدخول
-async function handleLogin() {
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    
-    if (!email || !password) {
-        createNotification('خطأ', 'يرجى إدخال البريد الإلكتروني وكلمة المرور', 'danger');
-        return;
-    }
-    
-    try {
-        const success = await signIn(email, password);
-        
-        if (success) {
-            // إغلاق مربع الحوار
-            document.getElementById('loginModal').remove();
-            
-            // عرض رسالة نجاح
-            createNotification('نجاح', 'تم تسجيل الدخول بنجاح', 'success');
-        } else {
-            createNotification('خطأ', 'فشل تسجيل الدخول. يرجى التحقق من معلومات الحساب', 'danger');
-        }
-    } catch (error) {
-        createNotification('خطأ', 'حدث خطأ أثناء تسجيل الدخول: ' + error.message, 'danger');
-    }
-}
-
-// معالجة إنشاء حساب
-async function handleRegister() {
-    const email = document.getElementById('registerEmail').value;
-    const password = document.getElementById('registerPassword').value;
-    const companyName = document.getElementById('companyName').value;
-    
-    if (!email || !password || !companyName) {
-        createNotification('خطأ', 'يرجى إدخال جميع المعلومات المطلوبة', 'danger');
-        return;
-    }
-    
-    if (password.length < 6) {
-        createNotification('خطأ', 'يجب أن تكون كلمة المرور 6 أحرف على الأقل', 'danger');
-        return;
-    }
-    
-    try {
-        const success = await createAccount(email, password, companyName);
-        
-        if (success) {
-            // إغلاق مربع الحوار
-            document.getElementById('loginModal').remove();
-            
-            // عرض رسالة نجاح
-            createNotification('نجاح', 'تم إنشاء الحساب بنجاح', 'success');
-        } else {
-            createNotification('خطأ', 'فشل إنشاء الحساب. يرجى المحاولة مرة أخرى', 'danger');
-        }
-    } catch (error) {
-        createNotification('خطأ', 'حدث خطأ أثناء إنشاء الحساب: ' + error.message, 'danger');
-    }
-}
-
-// إظهار مربع حوار إعدادات المزامنة
-function showSyncSettings() {
-    // إنشاء مربع حوار إعدادات المزامنة
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay active';
-    modal.id = 'syncSettingsModal';
-    
-    modal.innerHTML = `
-        <div class="modal">
-            <div class="modal-header">
-                <h2 class="modal-title">إعدادات المزامنة</h2>
-                <div class="modal-close" onclick="document.getElementById('syncSettingsModal').remove()">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="enableSyncCheckbox" ${syncEnabled ? 'checked' : ''}>
-                        <label class="form-check-label" for="enableSyncCheckbox">تفعيل المزامنة مع Firebase</label>
-                    </div>
-                    <p class="form-text">سيتم مزامنة البيانات تلقائيًا كل 5 دقائق وعند إجراء تغييرات.</p>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">حالة الاتصال</label>
-                    <div id="connectionStatus" class="alert ${currentUser ? 'alert-success' : 'alert-warning'}">
-                        <div class="alert-icon">
-                            <i class="fas fa-${currentUser ? 'check' : 'exclamation'}-circle"></i>
-                        </div>
-                        <div class="alert-content">
-                            <div class="alert-title">${currentUser ? 'متصل' : 'غير متصل'}</div>
-                            <div class="alert-text">${currentUser ? 'البريد الإلكتروني: ' + currentUser.email : 'يرجى تسجيل الدخول لتفعيل المزامنة'}</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">آخر مزامنة</label>
-                    <input type="text" class="form-control" value="${lastSyncTime ? new Date(parseInt(lastSyncTime)).toLocaleString('ar-IQ') : 'لم يتم المزامنة بعد'}" readonly>
-                </div>
-                
-                <div class="table-container" style="box-shadow: none; padding: 0;">
-                    <div class="table-header">
-                        <div class="table-title">النسخ الاحتياطية</div>
-                        <button class="btn btn-sm btn-primary" onclick="createBackupNow()">
-                            <i class="fas fa-plus"></i> إنشاء نسخة احتياطية
-                        </button>
-                    </div>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>اسم النسخة</th>
-                                <th>التاريخ</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody id="backupsList">
-                            <tr>
-                                <td colspan="3" style="text-align: center;">جاري تحميل النسخ الاحتياطية...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="table-container" style="box-shadow: none; padding: 0; margin-top: 20px;">
-                    <div class="table-header">
-                        <div class="table-title">المستثمرين المؤرشفين</div>
-                    </div>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>المستثمر</th>
-                                <th>تاريخ الأرشفة</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody id="archivedInvestorsList">
-                            <tr>
-                                <td colspan="3" style="text-align: center;">جاري تحميل المستثمرين المؤرشفين...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-light" onclick="document.getElementById('syncSettingsModal').remove()">إغلاق</button>
-                ${currentUser ? 
-                    `<button class="btn btn-danger" onclick="handleSignOut()">
-                        <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
-                    </button>` : 
-                    `<button class="btn btn-primary" onclick="showLoginDialog()">
-                        <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
-                    </button>`
-                }
-                <button class="btn btn-primary" onclick="saveSyncSettings()">حفظ الإعدادات</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // تحميل قائمة النسخ الاحتياطية والمستثمرين المؤرشفين
-    loadBackupsAndArchives();
-}
-
-// تحميل قائمة النسخ الاحتياطية والمستثمرين المؤرشفين
-async function loadBackupsAndArchives() {
-    if (!currentUser) return;
-    
-    // تحميل النسخ الاحتياطية
-    const backups = await getBackupsList();
-    const backupsList = document.getElementById('backupsList');
-    
-    if (backupsList) {
-        if (backups.length === 0) {
-            backupsList.innerHTML = '<tr><td colspan="3" style="text-align: center;">لا توجد نسخ احتياطية</td></tr>';
-        } else {
-            backupsList.innerHTML = '';
-            
-            backups.forEach(backup => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${backup.name}</td>
-                    <td>${backup.date}</td>
-                    <td>
-                        <button class="btn btn-info btn-icon action-btn" onclick="restoreBackupWithConfirmation('${backup.id}')">
-                            <i class="fas fa-undo"></i>
-                        </button>
-                        <button class="btn btn-danger btn-icon action-btn" onclick="deleteBackupWithConfirmation('${backup.id}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-                
-                backupsList.appendChild(row);
-            });
-        }
-    }
-    
-    // تحميل المستثمرين المؤرشفين
-    const archivedInvestors = await getArchivedInvestors();
-    const archivedInvestorsList = document.getElementById('archivedInvestorsList');
-    
-    if (archivedInvestorsList) {
-        if (archivedInvestors.length === 0) {
-            archivedInvestorsList.innerHTML = '<tr><td colspan="3" style="text-align: center;">لا يوجد مستثمرين مؤرشفين</td></tr>';
-        } else {
-            archivedInvestorsList.innerHTML = '';
-            
-            archivedInvestors.forEach(archive => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${archive.investor.name}</td>
-                    <td>${archive.date}</td>
-                    <td>
-                        <button class="btn btn-info btn-icon action-btn" onclick="restoreInvestorWithConfirmation('${archive.id}')">
-                            <i class="fas fa-undo"></i>
-                        </button>
-                    </td>
-                `;
-                
-                archivedInvestorsList.appendChild(row);
-            });
-        }
-    }
-}
-
-// حفظ إعدادات المزامنة
-function saveSyncSettings() {
-    const enableSync = document.getElementById('enableSyncCheckbox').checked;
-    
-    if (enableSync) {
-        if (!currentUser) {
-            createNotification('خطأ', 'يرجى تسجيل الدخول لتفعيل المزامنة', 'danger');
-            return;
-        }
-        
-        enableSync();
-    } else {
-        disableSync();
-    }
-    
-    // إغلاق مربع الحوار
-    document.getElementById('syncSettingsModal').remove();
-    
-    // عرض رسالة نجاح
-    createNotification('نجاح', 'تم حفظ إعدادات المزامنة بنجاح', 'success');
-}
-
-// تسجيل الخروج
-async function handleSignOut() {
-    if (confirm('هل أنت متأكد من تسجيل الخروج؟')) {
-        try {
-            await signOut();
-            
-            // إغلاق مربع الحوار
-            document.getElementById('syncSettingsModal').remove();
-            
-            // عرض رسالة نجاح
-            createNotification('نجاح', 'تم تسجيل الخروج بنجاح', 'success');
-        } catch (error) {
-            createNotification('خطأ', 'حدث خطأ أثناء تسجيل الخروج: ' + error.message, 'danger');
-        }
-    }
-}
-
-// إنشاء نسخة احتياطية جديدة
-async function createBackupNow() {
-    if (!currentUser) {
-        createNotification('خطأ', 'يرجى تسجيل الدخول لإنشاء نسخة احتياطية', 'danger');
-        return;
-    }
-    
-    // طلب اسم النسخة الاحتياطية
-    const backupName = prompt('أدخل اسم النسخة الاحتياطية (اختياري):', '');
-    
-    try {
-        const success = await createFirebaseBackup(backupName);
-        
-        if (success) {
-            // تحديث قائمة النسخ الاحتياطية
-            loadBackupsAndArchives();
-            
-            // عرض رسالة نجاح
-            createNotification('نجاح', 'تم إنشاء نسخة احتياطية بنجاح', 'success');
-        } else {
-            createNotification('خطأ', 'فشل إنشاء النسخة الاحتياطية', 'danger');
-        }
-    } catch (error) {
-        createNotification('خطأ', 'حدث خطأ أثناء إنشاء النسخة الاحتياطية: ' + error.message, 'danger');
-    }
-}
-
-// استعادة نسخة احتياطية مع تأكيد
-function restoreBackupWithConfirmation(backupId) {
-    if (confirm('هل أنت متأكد من استعادة هذه النسخة الاحتياطية؟ سيتم استبدال جميع البيانات الحالية.')) {
-        restoreBackup(backupId).then(success => {
-            if (success) {
-                // إغلاق مربع الحوار
-                document.getElementById('syncSettingsModal').remove();
-                
-                // عرض رسالة نجاح
-                createNotification('نجاح', 'تم استعادة النسخة الاحتياطية بنجاح', 'success');
-            } else {
-                createNotification('خطأ', 'فشل استعادة النسخة الاحتياطية', 'danger');
-            }
-        }).catch(error => {
-            createNotification('خطأ', 'حدث خطأ أثناء استعادة النسخة الاحتياطية: ' + error.message, 'danger');
-        });
-    }
-}
-
-// حذف نسخة احتياطية مع تأكيد
-function deleteBackupWithConfirmation(backupId) {
-    if (confirm('هل أنت متأكد من حذف هذه النسخة الاحتياطية؟')) {
-        deleteBackup(backupId).then(success => {
-            if (success) {
-                // تحديث قائمة النسخ الاحتياطية
-                loadBackupsAndArchives();
-                
-                // عرض رسالة نجاح
-                createNotification('نجاح', 'تم حذف النسخة الاحتياطية بنجاح', 'success');
-            } else {
-                createNotification('خطأ', 'فشل حذف النسخة الاحتياطية', 'danger');
-            }
-        }).catch(error => {
-            createNotification('خطأ', 'حدث خطأ أثناء حذف النسخة الاحتياطية: ' + error.message, 'danger');
-        });
-    }
-}
-
-// استعادة مستثمر من الأرشيف مع تأكيد
-function restoreInvestorWithConfirmation(investorId) {
-    if (confirm('هل أنت متأكد من استعادة هذا المستثمر؟')) {
-        restoreInvestor(investorId).then(success => {
-            if (success) {
-                // تحديث قائمة المستثمرين المؤرشفين
-                loadBackupsAndArchives();
-                
-                // عرض رسالة نجاح
-                createNotification('نجاح', 'تم استعادة المستثمر بنجاح', 'success');
-            } else {
-                createNotification('خطأ', 'فشل استعادة المستثمر', 'danger');
-            }
-        }).catch(error => {
-            createNotification('خطأ', 'حدث خطأ أثناء استعادة المستثمر: ' + error.message, 'danger');
-        });
-    }
-}
-
-// إظهار سجل الأنشطة
-async function showActivitiesLog() {
-    if (!currentUser) {
-        createNotification('خطأ', 'يرجى تسجيل الدخول لعرض سجل الأنشطة', 'danger');
-        return;
-    }
-    
-    try {
-        // جلب سجل الأنشطة
-        const activities = await getActivities();
-        
-        // إنشاء مربع حوار سجل الأنشطة
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.id = 'activitiesModal';
-        
-        modal.innerHTML = `
-            <div class="modal">
-                <div class="modal-header">
-                    <h2 class="modal-title">سجل الأنشطة</h2>
-                    <div class="modal-close" onclick="document.getElementById('activitiesModal').remove()">
-                        <i class="fas fa-times"></i>
-                    </div>
-                </div>
-                <div class="modal-body">
-                    <div class="table-container" style="box-shadow: none; padding: 0;">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>النوع</th>
-                                    <th>الوصف</th>
-                                    <th>التاريخ</th>
-                                </tr>
-                            </thead>
-                            <tbody id="activitiesList">
-                                ${activities.length === 0 ? '<tr><td colspan="3" style="text-align: center;">لا توجد أنشطة</td></tr>' : ''}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-light" onclick="document.getElementById('activitiesModal').remove()">إغلاق</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // ملء جدول الأنشطة
-        if (activities.length > 0) {
-            const activitiesList = document.getElementById('activitiesList');
-            activitiesList.innerHTML = '';
-            
-            activities.forEach(activity => {
-                const row = document.createElement('tr');
-                
-                // تحديد لون ورمز النوع
-                let typeIcon, typeColor;
-                
-                switch (activity.type) {
-                    case 'system':
-                        typeIcon = 'cog';
-                        typeColor = 'primary';
-                        break;
-                    case 'investor':
-                        typeIcon = 'user';
-                        typeColor = 'info';
-                        break;
-                    case 'investment':
-                        typeIcon = 'money-bill-wave';
-                        typeColor = 'success';
-                        break;
-                    case 'operation':
-                        typeIcon = 'exchange-alt';
-                        typeColor = 'warning';
-                        break;
-                    default:
-                        typeIcon = 'info-circle';
-                        typeColor = 'secondary';
-                }
-                
-                row.innerHTML = `
-                    <td>
-                        <span class="badge" style="background-color: var(--${typeColor}-color); color: white; padding: 5px 10px; border-radius: 50px;">
-                            <i class="fas fa-${typeIcon}"></i> ${activity.type}
-                        </span>
-                    </td>
-                    <td>${activity.description}</td>
-                    <td>${activity.date}</td>
-                `;
-                
-                activitiesList.appendChild(row);
-            });
-        }
-    } catch (error) {
-        console.error('خطأ في عرض سجل الأنشطة:', error);
-        createNotification('خطأ', 'حدث خطأ أثناء تحميل سجل الأنشطة', 'danger');
-    }
-}
-
-// تصدير وظائف المكتبة للاستخدام الخارجي
-window.firebaseApp = {
-    initializeFirebaseSync,
-    signIn,
-    signOut,
-    createAccount,
-    enableSync,
-    disableSync,
-    syncData,
-    createFirebaseBackup,
-    restoreBackup,
-    archiveInvestor,
-    restoreInvestor,
-    showLoginDialog,
-    showSyncSettings,
-    showActivitiesLog
-};
-
-
-
-
-
-
-/**
- * ملف تهيئة وإدماج Firebase مع نظام إدارة الاستثمار
- * 
- * يجب إضافة هذا الملف في نهاية صفحة HTML بعد تحميل جميع ملفات JavaScript الأخرى
- */
-
-// إضافة أيقونة المزامنة إلى شريط التنقل العلوي في كل صفحة
-function addSyncIconToAllPages() {
-    const headerActions = document.querySelectorAll('.header-actions');
-    
-    headerActions.forEach(headerAction => {
-        // التحقق مما إذا كانت أيقونة المزامنة موجودة بالفعل
-        if (headerAction.querySelector('.sync-controls')) return;
-        
-        // إنشاء أيقونة المزامنة
-        const syncControls = document.createElement('div');
-        syncControls.className = 'sync-controls';
-        syncControls.innerHTML = `
-            <div class="sync-btn" onclick="window.firebaseApp.showSyncSettings()" id="syncIcon">
-                <i class="fas fa-cloud"></i>
-            </div>
-            <span id="syncStatus" style="display: none;">غير متصل</span>
-            <span id="lastSyncTime" style="font-size: 0.75rem; color: var(--gray-600); margin-right: 5px; display: none;"></span>
-        `;
-        
-        // إضافة أيقونة المزامنة بعد عنصر البحث وقبل زر الإشعارات
-        const searchBar = headerAction.querySelector('.search-bar');
-        if (searchBar) {
-            searchBar.after(syncControls);
-        } else {
-            // إذا لم يكن هناك عنصر بحث، أضف أيقونة المزامنة في بداية العناصر
-            headerAction.prepend(syncControls);
-        }
-    });
-}
-
-// تحديث وظائف حذف المستثمر
-function updateDeleteInvestorFunction() {
-    // حفظ الدالة الأصلية
-    window.originalDeleteInvestor = window.deleteInvestor;
-    
-    // تعريف الدالة المعدلة
-    window.deleteInvestor = function(id) {
-        // البحث عن المستثمر
-        const investor = investors.find(inv => inv.id === id);
-        
-        if (!investor) {
-            createNotification('خطأ', 'المستثمر غير موجود', 'danger');
-            return;
-        }
-        
-        // فحص ما إذا كان لدى المستثمر استثمارات نشطة
-        const hasActiveInvestments = investments.some(
-            inv => inv.investorId === id && inv.status === 'active'
-        );
-        
-        // إنشاء خيارات الحذف
-        const options = [];
-        
-        if (hasActiveInvestments) {
-            options.push('archive_and_delete'); // أرشفة وحذف
-            options.push('close_and_delete'); // إغلاق الاستثمارات وحذف
-        } else {
-            options.push('delete'); // حذف فقط
-        }
-        
-        // إنشاء مربع حوار تأكيد الحذف
-        showDeleteConfirmationModal(investor, options);
-    };
-    
-    // تعريف دالة عرض مربع حوار تأكيد الحذف
-    window.showDeleteConfirmationModal = function(investor, options) {
-        // إنشاء مربع الحوار
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.id = 'deleteConfirmationModal';
-        
-        // تحديد محتوى مربع الحوار بناءً على الخيارات المتاحة
-        let optionsHtml = '';
-        
-        if (options.includes('archive_and_delete') && options.includes('close_and_delete')) {
-            optionsHtml = `
-                <div class="form-group">
-                    <div class="form-check">
-                        <input type="radio" class="form-check-input" id="deleteOption1" name="deleteOption" value="archive_and_delete" checked>
-                        <label class="form-check-label" for="deleteOption1">أرشفة المستثمر والاستثمارات مع الحفاظ على السجلات التاريخية</label>
-                    </div>
-                    <div class="form-text">سيتم أرشفة المستثمر وجميع بياناته في Firebase قبل الحذف. يمكن استعادة البيانات لاحقًا.</div>
-                </div>
-                <div class="form-group">
-                    <div class="form-check">
-                        <input type="radio" class="form-check-input" id="deleteOption2" name="deleteOption" value="close_and_delete">
-                        <label class="form-check-label" for="deleteOption2">إغلاق جميع الاستثمارات النشطة ثم حذف المستثمر</label>
-                    </div>
-                    <div class="form-text">سيتم تغيير حالة الاستثمارات النشطة إلى "مغلق" ثم حذف المستثمر. ستبقى سجلات العمليات موجودة.</div>
-                </div>
-            `;
-        } else if (options.includes('delete')) {
-            optionsHtml = `
-                <div class="form-group">
-                    <div class="form-check">
-                        <input type="radio" class="form-check-input" id="deleteOption3" name="deleteOption" value="delete" checked>
-                        <label class="form-check-label" for="deleteOption3">حذف المستثمر</label>
-                    </div>
-                    <div class="form-text">سيتم حذف المستثمر وبياناته من النظام. يمكن أرشفة البيانات في Firebase قبل الحذف.</div>
-                </div>
-            `;
-        }
-        
-        modal.innerHTML = `
-            <div class="modal">
-                <div class="modal-header">
-                    <h2 class="modal-title">تأكيد حذف المستثمر</h2>
-                    <div class="modal-close" onclick="document.getElementById('deleteConfirmationModal').remove()">
-                        <i class="fas fa-times"></i>
-                    </div>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-danger">
-                        <div class="alert-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <div class="alert-content">
-                            <div class="alert-title">تحذير!</div>
-                            <div class="alert-text">أنت على وشك حذف المستثمر: <strong>${investor.name}</strong></div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="archiveBeforeDelete" checked>
-                            <label class="form-check-label" for="archiveBeforeDelete">أرشفة البيانات في Firebase قبل الحذف</label>
-                        </div>
-                        <div class="form-text">سيتم حفظ نسخة من بيانات المستثمر في Firebase للرجوع إليها لاحقًا إذا لزم الأمر.</div>
-                    </div>
-                    
-                    ${optionsHtml}
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-light" onclick="document.getElementById('deleteConfirmationModal').remove()">إلغاء</button>
-                    <button class="btn btn-danger" onclick="processDeleteInvestor('${investor.id}')">
-                        <i class="fas fa-trash"></i> حذف المستثمر
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-    };
-    
-    // تعريف دالة معالجة حذف المستثمر
-    window.processDeleteInvestor = async function(investorId) {
-        // الحصول على خيارات الحذف
-        const archiveBeforeDelete = document.getElementById('archiveBeforeDelete').checked;
-        
-        // خيار الحذف المحدد
-        let deleteOption = 'delete';
-        const deleteOptions = document.getElementsByName('deleteOption');
-        
-        for (const option of deleteOptions) {
-            if (option.checked) {
-                deleteOption = option.value;
-                break;
-            }
-        }
-        
-        // إغلاق مربع الحوار
-        document.getElementById('deleteConfirmationModal').remove();
-        
-        // البحث عن المستثمر
-        const investor = investors.find(inv => inv.id === investorId);
-        
-        if (!investor) {
-            createNotification('خطأ', 'المستثمر غير موجود', 'danger');
-            return;
-        }
-        
-        // أرشفة البيانات في Firebase إذا تم تحديد هذا الخيار
-        if (archiveBeforeDelete && window.firebaseApp && window.syncEnabled) {
-            try {
-                // عرض رسالة أثناء الأرشفة
-                createNotification('معلومات', 'جاري أرشفة بيانات المستثمر...', 'info');
-                
-                // أرشفة المستثمر
-                await window.firebaseApp.archiveInvestor(investorId);
-            } catch (error) {
-                console.error('خطأ في أرشفة بيانات المستثمر:', error);
-                
-                // إذا فشلت الأرشفة، نسأل المستخدم ما إذا كان يريد المتابعة
-                if (!confirm('فشلت عملية أرشفة البيانات. هل تريد المتابعة في حذف المستثمر؟')) {
-                    return;
-                }
-            }
-        }
-        
-        // معالجة الخيار المحدد
-        if (deleteOption === 'archive_and_delete') {
-            // أرشفة وحذف
-            
-            // 1. حذف المستثمر من المصفوفة
-            investors = investors.filter(inv => inv.id !== investorId);
-            
-            // 2. الاحتفاظ باستثمارات المستثمر وإغلاقها
-            investments.forEach(investment => {
-                if (investment.investorId === investorId && investment.status === 'active') {
-                    investment.status = 'closed';
-                    
-                    // إضافة عملية إغلاق الاستثمار
-                    const closeOperation = {
-                        id: generateOperationId(),
-                        investorId: investorId,
-                        investmentId: investment.id,
-                        type: 'close',
-                        amount: investment.amount,
-                        date: new Date().toISOString(),
-                        notes: 'إغلاق الاستثمار بسبب حذف المستثمر',
-                        status: 'active'
-                    };
-                    
-                    operations.push(closeOperation);
-                }
-            });
-            
-            // تسجيل نشاط حذف المستثمر
-            if (window.firebaseApp) {
-                window.firebaseApp.logActivity('investor', 'تم حذف المستثمر: ' + investor.name, investorId);
-            }
-            
-        } else if (deleteOption === 'close_and_delete') {
-            // إغلاق الاستثمارات وحذف
-            
-            // 1. إغلاق جميع الاستثمارات النشطة
-            investments.forEach(investment => {
-                if (investment.investorId === investorId && investment.status === 'active') {
-                    investment.status = 'closed';
-                    
-                    // إضافة عملية إغلاق الاستثمار
-                    const closeOperation = {
-                        id: generateOperationId(),
-                        investorId: investorId,
-                        investmentId: investment.id,
-                        type: 'close',
-                        amount: investment.amount,
-                        date: new Date().toISOString(),
-                        notes: 'إغلاق الاستثمار بسبب حذف المستثمر',
-                        status: 'active'
-                    };
-                    
-                    operations.push(closeOperation);
-                }
-            });
-            
-            // 2. حذف المستثمر
-            investors = investors.filter(inv => inv.id !== investorId);
-            
-            // تسجيل نشاط حذف المستثمر
-            if (window.firebaseApp) {
-                window.firebaseApp.logActivity('investor', 'تم حذف المستثمر مع إغلاق الاستثمارات النشطة: ' + investor.name, investorId);
-            }
-            
-        } else {
-            // حذف عادي
-            
-            // 1. حذف المستثمر
-            investors = investors.filter(inv => inv.id !== investorId);
-            
-            // 2. حذف استثمارات المستثمر
-            investments = investments.filter(inv => inv.investorId !== investorId);
-            
-            // 3. الاحتفاظ بسجلات العمليات للرجوع إليها
-            
-            // تسجيل نشاط حذف المستثمر
-            if (window.firebaseApp) {
-                window.firebaseApp.logActivity('investor', 'تم حذف المستثمر ومسح جميع بياناته: ' + investor.name, investorId);
-            }
-        }
-        
-        // حفظ البيانات
-        saveData();
-        
-        // إذا كانت المزامنة مفعلة، قم بدفع التغييرات إلى Firebase
-        if (window.firebaseApp && window.syncEnabled) {
-            window.firebaseApp.syncData();
-        }
-        
-        // تحديث قائمة المستثمرين
-        loadInvestors();
-        
-        // عرض رسالة نجاح
-        createNotification('نجاح', 'تم حذف المستثمر بنجاح', 'success');
-    };
-}
-
-// إضافة مستمعي الأحداث للتغييرات في التخزين المحلي
-function addStorageEventListeners() {
-    // إنشاء وظيفة مساعدة لإرسال أحداث تغيير التخزين
-    const originalSetItem = localStorage.setItem;
-    localStorage.setItem = function(key, value) {
-        // استدعاء الوظيفة الأصلية
-        originalSetItem.call(this, key, value);
-        
-        // إرسال حدث تغيير التخزين
-        const event = new CustomEvent('storage-changed', {
-            detail: { key, value }
-        });
-        window.dispatchEvent(event);
-    };
-}
-
-// تهيئة Firebase عند تحميل الصفحة
-function initializeFirebase() {
-    // تهيئة Firebase
-    if (window.firebaseApp) {
-        window.firebaseApp.initializeFirebaseSync();
-    } else {
-        console.error("خطأ: لم يتم العثور على كائن firebaseApp");
-    }
-    
-    // إضافة حالة المزامنة إلى window
-    window.syncEnabled = localStorage.getItem('syncEnabled') === 'true';
-    window.currentUser = null;
-    
-    // إضافة مستمع للتحقق من حالة المصادقة
-    firebase.auth().onAuthStateChanged(function(user) {
-        window.currentUser = user;
-        
-        // تحديث واجهة المستخدم
-        if (user) {
-            const syncStatus = document.getElementById('syncStatus');
-            if (syncStatus) {
-                syncStatus.textContent = 'متصل: ' + user.email;
-            }
-        }
-    });
-    
-    // أضف أيقونة المزامنة إلى جميع الصفحات
-    addSyncIconToAllPages();
-    
-    // تحديث وظائف حذف المستثمر
-    updateDeleteInvestorFunction();
-    
-    // إضافة مستمعي الأحداث للتغييرات في التخزين المحلي
-    addStorageEventListeners();
-    
-    // تسجيل حدث تهيئة Firebase
-    console.log("تم تهيئة Firebase بنجاح");
-}
-
-// استدعاء دالة التهيئة عند تحميل الصفحة
-document.addEventListener('DOMContentLoaded', initializeFirebase);
-
-// إضافة مستمع للتنقل بين الصفحات
-window.addEventListener('page-changed', function(e) {
-    // تأكد من أن أيقونة المزامنة موجودة في الصفحة الجديدة
-    addSyncIconToAllPages();
+    // ضبط المخططات البيانية
+    setupCharts();
 });
 
-// تجاوز دالة showPage الأصلية لتسجيل أحداث تغيير الصفحة
-const originalShowPage = window.showPage;
-window.showPage = function(pageId) {
-    // استدعاء الدالة الأصلية
-    originalShowPage(pageId);
-    
-    // إرسال حدث تغيير الصفحة
-    const event = new CustomEvent('page-changed', { detail: { pageId } });
-    window.dispatchEvent(event);
-};
-
-// إطلاق الخدمات التلقائية
-function startAutomaticServices() {
-    // التحقق من النسخ الاحتياطي التلقائي
-    const autoBackupEnabled = localStorage.getItem('autoBackupEnabled') === 'true';
-    const autoBackupFrequency = localStorage.getItem('autoBackupFrequency') || 'weekly';
-    const lastAutoBackup = localStorage.getItem('lastAutoBackup');
-    
-    if (autoBackupEnabled && window.syncEnabled && window.currentUser) {
-        const now = new Date();
-        const lastBackupDate = lastAutoBackup ? new Date(parseInt(lastAutoBackup)) : null;
-        
-        let shouldBackup = false;
-        
-        if (!lastBackupDate) {
-            shouldBackup = true;
-        } else {
-            const daysSinceLastBackup = Math.floor((now - lastBackupDate) / (1000 * 60 * 60 * 24));
+/**
+ * إضافة مستمع للتنقل بين الصفحات لحل مشكلة فقدان البيانات
+ */
+function addPageNavigationListener() {
+    // إضافة مستمع لكل عناصر القائمة
+    document.querySelectorAll('.menu-item').forEach(menuItem => {
+        menuItem.addEventListener('click', function(event) {
+            // حفظ البيانات الحالية قبل الانتقال
+            saveData();
             
-            if (autoBackupFrequency === 'daily' && daysSinceLastBackup >= 1) {
-                shouldBackup = true;
-            } else if (autoBackupFrequency === 'weekly' && daysSinceLastBackup >= 7) {
-                shouldBackup = true;
-            } else if (autoBackupFrequency === 'monthly' && daysSinceLastBackup >= 30) {
-                shouldBackup = true;
-            }
+            // الحصول على معرف الصفحة المستهدفة
+            const targetPage = this.getAttribute('href').substring(1);
+            
+            // إذا كان هناك نموذج مفتوح، قم بإغلاقه
+            const openModals = document.querySelectorAll('.modal-overlay.active');
+            openModals.forEach(modal => {
+                const modalId = modal.id;
+                closeModal(modalId);
+            });
+        });
+    });
+    
+    // إضافة مستمع للتنقل بين الصفحات عبر تغيير قيمة window.location.hash
+    window.addEventListener('hashchange', function() {
+        // الحصول على معرف الصفحة من hash
+        const pageId = window.location.hash.substring(1);
+        if (pageId) {
+            // حفظ البيانات قبل تحميل الصفحة الجديدة
+            saveData();
+            // عرض الصفحة المطلوبة
+            showPage(pageId);
         }
-        
-        if (shouldBackup) {
-            // إنشاء نسخة احتياطية تلقائية
-            window.firebaseApp.createFirebaseBackup('نسخة تلقائية ' + now.toLocaleDateString('ar-IQ'))
-                .then(success => {
-                    if (success) {
-                        localStorage.setItem('lastAutoBackup', now.getTime().toString());
-                        console.log('تم إنشاء نسخة احتياطية تلقائية بنجاح');
-                    }
-                })
-                .catch(error => {
-                    console.error('خطأ في إنشاء النسخة الاحتياطية التلقائية:', error);
-                });
+    });
+    
+    // تحميل الصفحة المطلوبة عند بدء التشغيل
+    const pageId = window.location.hash.substring(1) || 'dashboard';
+    showPage(pageId);
+}
+
+/**
+ * تعيين التاريخ الافتراضي في نماذج الإدخال
+ */
+function setDefaultDates() {
+    // تعيين التاريخ الحالي لكل حقول التاريخ
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        if (!input.value) {
+            input.valueAsDate = new Date();
         }
+    });
+    
+    // تحديث رسالة الأيام عند تغيير تاريخ الاستثمار
+    const investmentDateInput = document.getElementById('investmentDate');
+    if (investmentDateInput) {
+        investmentDateInput.addEventListener('change', updateDaysMessage);
+        // تحديث الرسالة عند التحميل
+        updateDaysMessage();
+    }
+    
+    // تحديث الربح المتوقع عند تغيير مبلغ الاستثمار
+    const investmentAmountInput = document.getElementById('investmentAmount');
+    if (investmentAmountInput) {
+        investmentAmountInput.addEventListener('input', updateExpectedProfit);
+        // تحديث الربح المتوقع عند التحميل
+        updateExpectedProfit();
+    }
+    
+    // تحديث الربح المتوقع للاستثمار الأولي
+    const initialInvestmentAmountInput = document.getElementById('initialInvestmentAmount');
+    if (initialInvestmentAmountInput) {
+        initialInvestmentAmountInput.addEventListener('input', updateInitialExpectedProfit);
     }
 }
 
-// استدعاء دالة الخدمات التلقائية كل ساعة
-setInterval(startAutomaticServices, 60 * 60 * 1000);
+/**
+ * إضافة مستمعي الأحداث للعناصر المختلفة
+ */
+function addEventListeners() {
+    // إضافة مستمع لتغيير تاريخ الاستثمار
+    const investmentDateInput = document.getElementById('investmentDate');
+    if (investmentDateInput) {
+        investmentDateInput.addEventListener('change', updateDaysMessage);
+    }
+    
+    // إضافة مستمع لتغيير مبلغ الاستثمار
+    const investmentAmountInput = document.getElementById('investmentAmount');
+    if (investmentAmountInput) {
+        investmentAmountInput.addEventListener('input', updateExpectedProfit);
+    }
+    
+    // إضافة مستمع لاختيار المستثمر في نموذج السحب
+    const withdrawInvestorSelect = document.getElementById('withdrawInvestor');
+    if (withdrawInvestorSelect) {
+        withdrawInvestorSelect.addEventListener('change', populateInvestmentSelect);
+    }
+    
+    // إضافة مستمع لاختيار الاستثمار في نموذج السحب
+    const withdrawInvestmentSelect = document.getElementById('withdrawInvestment');
+    if (withdrawInvestmentSelect) {
+        withdrawInvestmentSelect.addEventListener('change', updateAvailableAmount);
+    }
+    
+    // إضافة مستمع لاختيار المستثمر في نموذج دفع الأرباح
+    const profitInvestorSelect = document.getElementById('profitInvestor');
+    if (profitInvestorSelect) {
+        profitInvestorSelect.addEventListener('change', updateDueProfit);
+    }
+    
+    // إضافة مستمع لاختيار فترة الأرباح
+    const profitPeriodSelect = document.getElementById('profitPeriod');
+    if (profitPeriodSelect) {
+        profitPeriodSelect.addEventListener('change', toggleCustomProfitPeriod);
+    }
+    
+    // إضافة مستمع لاختيار فترة التقرير المالي
+    const financialReportPeriodSelect = document.getElementById('financialReportPeriod');
+    if (financialReportPeriodSelect) {
+        financialReportPeriodSelect.addEventListener('change', toggleCustomDateRange);
+    }
+    
+    // إضافة مستمع للبحث عن المستثمرين
+    const investorSearchInput = document.getElementById('investorSearchInput');
+    if (investorSearchInput) {
+        investorSearchInput.addEventListener('input', searchInvestors);
+    }
+    
+    // إضافة مستمع للبحث عن الاستثمارات
+    const investmentSearchInput = document.getElementById('investmentSearchInput');
+    if (investmentSearchInput) {
+        investmentSearchInput.addEventListener('input', searchInvestments);
+    }
+    
+    // إضافة مستمع للبحث عن العمليات
+    const operationsSearchInput = document.getElementById('operationsSearchInput');
+    if (operationsSearchInput) {
+        operationsSearchInput.addEventListener('input', searchOperations);
+    }
+}
 
-// استدعاء دالة الخدمات التلقائية عند تحميل الصفحة
-setTimeout(startAutomaticServices, 5000);
+// الوظائف الناقصة في التطبيق
+
+/**
+ * تهيئة تطبيق Firebase
+ */
+function setupFirebaseApp() {
+    // إنشاء كائن التطبيق العالمي
+    window.firebaseApp = {
+        isInitialized: false,
+        currentUser: null,
+        
+        // تهيئة Firebase
+        init: function() {
+            if (this.isInitialized) return;
+            
+            try {
+                // تهيئة Firebase باستخدام الإعدادات المحددة
+                firebase.initializeApp(firebaseConfig);
+                
+                // تسجيل مستمع لتغييرات حالة المصادقة
+                firebase.auth().onAuthStateChanged(user => {
+                    if (user) {
+                        // تم تسجيل الدخول
+                        this.currentUser = user;
+                        console.log('تم تسجيل الدخول كـ:', user.email);
+                        
+                        // إظهار معلومات المستخدم في واجهة المستخدم
+                        const loggedInUser = document.getElementById('loggedInUser');
+                        if (loggedInUser) {
+                            loggedInUser.textContent = user.email;
+                        }
+                        
+                        // إظهار زر تسجيل الخروج
+                        const signOutButton = document.getElementById('signOutButton');
+                        if (signOutButton) {
+                            signOutButton.style.display = 'inline-block';
+                        }
+                        
+                        // تحديث حالة المزامنة إذا كانت مفعلة
+                        const syncEnabled = localStorage.getItem('syncEnabled') === 'true';
+                        if (syncEnabled) {
+                            enableSync();
+                        }
+                    } else {
+                        // لم يتم تسجيل الدخول
+                        this.currentUser = null;
+                        console.log('غير مسجل الدخول');
+                        
+                        // إخفاء زر تسجيل الخروج
+                        const signOutButton = document.getElementById('signOutButton');
+                        if (signOutButton) {
+                            signOutButton.style.display = 'none';
+                        }
+                        
+                        // تعطيل المزامنة
+                        disableSync();
+                    }
+                    
+                    // تحديث حالة المزامنة في الإعدادات
+                    updateSyncSettingsStatus();
+                });
+                
+                this.isInitialized = true;
+                console.log('تم تهيئة Firebase بنجاح');
+            } catch (error) {
+                console.error('خطأ في تهيئة Firebase:', error);
+                createNotification('خطأ', 'حدث خطأ أثناء تهيئة Firebase', 'danger');
+            }
+        },
+        
+        // إظهار حوار تسجيل الدخول
+        showLoginDialog: function() {
+            // تهيئة Firebase إذا لم يتم ذلك بعد
+            this.init();
+            
+            // إظهار حوار المزامنة
+            openModal('syncDialog');
+            
+            // إظهار نموذج تسجيل الدخول
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('syncOptions').style.display = 'none';
+        },
+        
+        // إظهار إعدادات المزامنة
+        showSyncSettings: function() {
+            // تهيئة Firebase إذا لم يتم ذلك بعد
+            this.init();
+            
+            // إظهار حوار المزامنة
+            showSyncDialog();
+        },
+        
+        // تسجيل الخروج
+        signOut: function() {
+            if (!this.isInitialized) {
+                console.warn('لم يتم تهيئة Firebase بعد');
+                return;
+            }
+            
+            firebase.auth().signOut().then(() => {
+                // تم تسجيل الخروج بنجاح
+                this.currentUser = null;
+                console.log('تم تسجيل الخروج بنجاح');
+                
+                // تعطيل المزامنة
+                disableSync();
+                
+                // تحديث واجهة المستخدم
+                updateSyncSettingsStatus();
+                
+                // إغلاق مربع الحوار إذا كان مفتوحًا
+                closeModal('syncDialog');
+                
+                // إظهار رسالة نجاح
+                createNotification('نجاح', 'تم تسجيل الخروج بنجاح', 'success');
+            }).catch(error => {
+                console.error('خطأ في تسجيل الخروج:', error);
+                createNotification('خطأ', 'حدث خطأ أثناء تسجيل الخروج', 'danger');
+            });
+        },
+        
+        // مزامنة البيانات مع Firebase
+        syncData: function() {
+            if (!this.isInitialized || !this.currentUser) {
+                console.warn('لم يتم تهيئة Firebase أو تسجيل الدخول');
+                return;
+            }
+            
+            // الحصول على مرجع لقاعدة البيانات
+            const db = firebase.database();
+            const userId = this.currentUser.uid;
+            
+            // حفظ البيانات في Firebase
+            db.ref('users/' + userId + '/data').set({
+                investors: investors,
+                investments: investments,
+                operations: operations,
+                settings: settings,
+                events: events,
+                notifications: notifications,
+                lastSyncTime: new Date().toISOString()
+            }).then(() => {
+                console.log('تمت المزامنة بنجاح');
+                
+                // تحديث وقت آخر مزامنة
+                lastSyncTime = new Date().toISOString();
+                localStorage.setItem('lastSyncTime', lastSyncTime);
+                
+                // تحديث عرض وقت آخر مزامنة
+                const lastSyncTimeElement = document.getElementById('lastSyncTime');
+                if (lastSyncTimeElement) {
+                    lastSyncTimeElement.textContent = `آخر مزامنة: ${formatDate(lastSyncTime)} ${formatTime(lastSyncTime)}`;
+                    lastSyncTimeElement.style.display = 'inline-block';
+                }
+            }).catch(error => {
+                console.error('خطأ في المزامنة:', error);
+                createNotification('خطأ', 'حدث خطأ أثناء المزامنة', 'danger');
+            });
+        },
+        
+        // استيراد البيانات من Firebase
+        importData: function() {
+            if (!this.isInitialized || !this.currentUser) {
+                console.warn('لم يتم تهيئة Firebase أو تسجيل الدخول');
+                return;
+            }
+            
+            // الحصول على مرجع لقاعدة البيانات
+            const db = firebase.database();
+            const userId = this.currentUser.uid;
+            
+            // قراءة البيانات من Firebase
+            db.ref('users/' + userId + '/data').once('value').then(snapshot => {
+                const data = snapshot.val();
+                
+                if (!data) {
+                    console.warn('لا توجد بيانات للاستيراد');
+                    createNotification('تنبيه', 'لا توجد بيانات للاستيراد', 'warning');
+                    return;
+                }
+                
+                // استيراد البيانات
+                if (data.investors) investors = data.investors;
+                if (data.investments) investments = data.investments;
+                if (data.operations) operations = data.operations;
+                if (data.settings) settings = {...settings, ...data.settings};
+                if (data.events) events = data.events;
+                if (data.notifications) notifications = data.notifications;
+                
+                // حفظ البيانات محليًا
+                saveData();
+                saveNotifications();
+                
+                // تحديث وقت آخر مزامنة
+                lastSyncTime = data.lastSyncTime || new Date().toISOString();
+                localStorage.setItem('lastSyncTime', lastSyncTime);
+                
+                // تحديث عرض وقت آخر مزامنة
+                const lastSyncTimeElement = document.getElementById('lastSyncTime');
+                if (lastSyncTimeElement) {
+                    lastSyncTimeElement.textContent = `آخر مزامنة: ${formatDate(lastSyncTime)} ${formatTime(lastSyncTime)}`;
+                    lastSyncTimeElement.style.display = 'inline-block';
+                }
+                
+                // تحديث الواجهة
+                updateDashboard();
+                
+                console.log('تم استيراد البيانات بنجاح');
+                createNotification('نجاح', 'تم استيراد البيانات بنجاح', 'success');
+            }).catch(error => {
+                console.error('خطأ في استيراد البيانات:', error);
+                createNotification('خطأ', 'حدث خطأ أثناء استيراد البيانات', 'danger');
+            });
+        },
+        
+        // إنشاء نسخة احتياطية في Firebase
+        createBackup: function() {
+            if (!this.isInitialized || !this.currentUser) {
+                console.warn('لم يتم تهيئة Firebase أو تسجيل الدخول');
+                return;
+            }
+            
+            // إنشاء اسم النسخة الاحتياطية
+            const date = new Date();
+            const backupName = prompt('أدخل اسم النسخة الاحتياطية (اختياري):', 
+                `نسخة احتياطية ${date.toLocaleDateString('ar-IQ')} ${date.toLocaleTimeString('ar-IQ')}`);
+            
+            if (backupName === null) return;
+            
+            // إنشاء النسخة الاحتياطية
+            const backup = {
+                id: generateId(),
+                name: backupName,
+                date: date.toISOString(),
+                data: {
+                    investors,
+                    investments,
+                    operations,
+                    settings,
+                    events,
+                    notifications
+                }
+            };
+            
+            // الحصول على مرجع لقاعدة البيانات
+            const db = firebase.database();
+            const userId = this.currentUser.uid;
+            
+            // حفظ النسخة الاحتياطية في Firebase
+            db.ref('users/' + userId + '/backups/' + backup.id).set(backup).then(() => {
+                console.log('تم إنشاء نسخة احتياطية بنجاح');
+                
+                // إضافة النسخة الاحتياطية إلى القائمة المحلية
+                backupList.push(backup);
+                
+                // حفظ قائمة النسخ الاحتياطية
+                saveBackupList();
+                
+                // تحديث قائمة النسخ الاحتياطية
+                updateBackupsList();
+                
+                // إظهار رسالة نجاح
+                createNotification('نجاح', 'تم إنشاء نسخة احتياطية بنجاح', 'success');
+            }).catch(error => {
+                console.error('خطأ في إنشاء النسخة الاحتياطية:', error);
+                createNotification('خطأ', 'حدث خطأ أثناء إنشاء النسخة الاحتياطية', 'danger');
+            });
+        },
+        
+        // استعادة نسخة احتياطية من Firebase
+        restoreBackup: function(backupId) {
+            if (!this.isInitialized || !this.currentUser) {
+                console.warn('لم يتم تهيئة Firebase أو تسجيل الدخول');
+                return;
+            }
+            
+            if (!backupId) {
+                const backupsListElement = document.getElementById('backupsList');
+                if (!backupsListElement || !backupsListElement.value) {
+                    createNotification('خطأ', 'يرجى اختيار نسخة احتياطية', 'danger');
+                    return;
+                }
+                
+                backupId = backupsListElement.value;
+            }
+            
+            // الحصول على مرجع لقاعدة البيانات
+            const db = firebase.database();
+            const userId = this.currentUser.uid;
+            
+            // قراءة النسخة الاحتياطية من Firebase
+            db.ref('users/' + userId + '/backups/' + backupId).once('value').then(snapshot => {
+                const backup = snapshot.val();
+                
+                if (!backup) {
+                    console.warn('النسخة الاحتياطية غير موجودة');
+                    createNotification('خطأ', 'النسخة الاحتياطية غير موجودة', 'danger');
+                    return;
+                }
+                
+                // التأكيد على الاستعادة
+                if (!confirm(`هل أنت متأكد من استعادة النسخة الاحتياطية "${backup.name}"؟ سيتم استبدال جميع البيانات الحالية.`)) {
+                    return;
+                }
+                
+                // استعادة البيانات
+                const data = backup.data;
+                
+                if (data.investors) investors = data.investors;
+                if (data.investments) investments = data.investments;
+                if (data.operations) operations = data.operations;
+                if (data.settings) settings = {...settings, ...data.settings};
+                if (data.events) events = data.events;
+                if (data.notifications) notifications = data.notifications;
+                
+                // حفظ البيانات محليًا
+                saveData();
+                saveNotifications();
+                
+                // إظهار رسالة نجاح
+                createNotification('نجاح', 'تم استعادة النسخة الاحتياطية بنجاح', 'success');
+                
+                // إعادة تحميل الصفحة
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }).catch(error => {
+                console.error('خطأ في استعادة النسخة الاحتياطية:', error);
+                createNotification('خطأ', 'حدث خطأ أثناء استعادة النسخة الاحتياطية', 'danger');
+            });
+        },
+        
+        // حذف نسخة احتياطية من Firebase
+        deleteBackup: function(backupId) {
+            if (!this.isInitialized || !this.currentUser) {
+                console.warn('لم يتم تهيئة Firebase أو تسجيل الدخول');
+                return;
+            }
+            
+            if (!backupId) {
+                const backupsListElement = document.getElementById('backupsList');
+                if (!backupsListElement || !backupsListElement.value) {
+                    createNotification('خطأ', 'يرجى اختيار نسخة احتياطية', 'danger');
+                    return;
+                }
+                
+                backupId = backupsListElement.value;
+            }
+            
+            // البحث عن النسخة الاحتياطية في القائمة المحلية
+            const backup = backupList.find(b => b.id === backupId);
+            
+            if (!backup) {
+                createNotification('خطأ', 'النسخة الاحتياطية غير موجودة', 'danger');
+                return;
+            }
+            
+            // التأكيد على الحذف
+            if (!confirm(`هل أنت متأكد من حذف النسخة الاحتياطية "${backup.name}"؟`)) {
+                return;
+            }
+            
+            // الحصول على مرجع لقاعدة البيانات
+            const db = firebase.database();
+            const userId = this.currentUser.uid;
+            
+            // حذف النسخة الاحتياطية من Firebase
+            db.ref('users/' + userId + '/backups/' + backupId).remove().then(() => {
+                console.log('تم حذف النسخة الاحتياطية بنجاح');
+                
+                // حذف النسخة الاحتياطية من القائمة المحلية
+                backupList = backupList.filter(b => b.id !== backupId);
+                
+                // حفظ قائمة النسخ الاحتياطية
+                saveBackupList();
+                
+                // تحديث قائمة النسخ الاحتياطية
+                updateBackupsList();
+                
+                // إظهار رسالة نجاح
+                createNotification('نجاح', 'تم حذف النسخة الاحتياطية بنجاح', 'success');
+            }).catch(error => {
+                console.error('خطأ في حذف النسخة الاحتياطية:', error);
+                createNotification('خطأ', 'حدث خطأ أثناء حذف النسخة الاحتياطية', 'danger');
+            });
+        },
+        
+        // إظهار سجل الأنشطة
+        showActivitiesLog: function() {
+            if (!this.isInitialized || !this.currentUser) {
+                console.warn('لم يتم تهيئة Firebase أو تسجيل الدخول');
+                return;
+            }
+            
+            // إنشاء مربع حوار لعرض سجل الأنشطة
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay active';
+            modal.id = 'activitiesLogModal';
+            
+            modal.innerHTML = `
+                <div class="modal">
+                    <div class="modal-header">
+                        <h2 class="modal-title">سجل الأنشطة</h2>
+                        <div class="modal-close" onclick="document.getElementById('activitiesLogModal').remove()">
+                            <i class="fas fa-times"></i>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-container" style="box-shadow: none; padding: 0;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>التاريخ</th>
+                                        <th>الوقت</th>
+                                        <th>النوع</th>
+                                        <th>الوصف</th>
+                                        <th>المستخدم</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activitiesLogTableBody">
+                                    <tr>
+                                        <td colspan="5" style="text-align: center;">جاري تحميل سجل الأنشطة...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-light" onclick="document.getElementById('activitiesLogModal').remove()">إغلاق</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // الحصول على مرجع لقاعدة البيانات
+            const db = firebase.database();
+            const userId = this.currentUser.uid;
+            
+            // قراءة سجل الأنشطة من Firebase
+            db.ref('users/' + userId + '/activities').orderByChild('date').limitToLast(100).once('value').then(snapshot => {
+                const activities = [];
+                
+                snapshot.forEach(childSnapshot => {
+                    activities.push(childSnapshot.val());
+                });
+                
+                // ترتيب الأنشطة حسب التاريخ (الأحدث أولاً)
+                activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                // عرض الأنشطة في الجدول
+                const tbody = document.getElementById('activitiesLogTableBody');
+                
+                if (activities.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center;">لا توجد أنشطة</td></tr>`;
+                    return;
+                }
+                
+                tbody.innerHTML = '';
+                
+                activities.forEach(activity => {
+                    const row = document.createElement('tr');
+                    
+                    row.innerHTML = `
+                        <td>${formatDate(activity.date)}</td>
+                        <td>${formatTime(activity.date)}</td>
+                        <td>${activity.entityType}</td>
+                        <td>${activity.description}</td>
+                        <td>${activity.userId}</td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+            }).catch(error => {
+                console.error('خطأ في قراءة سجل الأنشطة:', error);
+                
+                // عرض رسالة الخطأ في الجدول
+                const tbody = document.getElementById('activitiesLogTableBody');
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center;">حدث خطأ أثناء تحميل سجل الأنشطة</td></tr>`;
+            });
+        }
+    };
+    
+    // تهيئة Firebase
+    window.firebaseApp.init();
+}
+
+/**
+ * جدولة النسخ الاحتياطي التلقائي
+ */
+function scheduleAutoBackup() {
+    // التحقق مما إذا كان النسخ الاحتياطي التلقائي مفعلاً
+    const autoBackupEnabled = localStorage.getItem('autoBackupEnabled') === 'true';
+    if (!autoBackupEnabled) return;
+    
+    // الحصول على تردد النسخ الاحتياطي
+    const autoBackupFrequency = localStorage.getItem('autoBackupFrequency') || 'weekly';
+    
+    // الحصول على تاريخ آخر نسخة احتياطية
+    const lastAutoBackupDate = localStorage.getItem('lastAutoBackupDate');
+    
+    // حساب تاريخ النسخة الاحتياطية التالية
+    let nextBackupDate;
+    const now = new Date();
+    
+    if (lastAutoBackupDate) {
+        const lastDate = new Date(lastAutoBackupDate);
+        
+        switch (autoBackupFrequency) {
+            case 'daily':
+                // النسخ الاحتياطي اليومي
+                nextBackupDate = new Date(lastDate);
+                nextBackupDate.setDate(nextBackupDate.getDate() + 1);
+                break;
+            case 'weekly':
+                // النسخ الاحتياطي الأسبوعي
+                nextBackupDate = new Date(lastDate);
+                nextBackupDate.setDate(nextBackupDate.getDate() + 7);
+                break;
+            case 'monthly':
+                // النسخ الاحتياطي الشهري
+                nextBackupDate = new Date(lastDate);
+                nextBackupDate.setMonth(nextBackupDate.getMonth() + 1);
+                break;
+            default:
+                // النسخ الاحتياطي الأسبوعي كإعداد افتراضي
+                nextBackupDate = new Date(lastDate);
+                nextBackupDate.setDate(nextBackupDate.getDate() + 7);
+        }
+    } else {
+        // لم يتم إجراء نسخ احتياطي من قبل، قم بتعيين تاريخ النسخة الاحتياطية التالية إلى الآن
+        nextBackupDate = now;
+    }
+    
+    // التحقق مما إذا كان الوقت قد حان لإجراء نسخة احتياطية
+    if (now >= nextBackupDate) {
+        // إنشاء نسخة احتياطية
+        createBackup();
+        
+        // تحديث تاريخ آخر نسخة احتياطية
+        localStorage.setItem('lastAutoBackupDate', now.toISOString());
+    }
+}
+
+/**
+ * إعداد المخططات البيانية
+ */
+function setupCharts() {
+    // إعداد الرسم البياني للاستثمارات
+    const investmentChartContainer = document.getElementById('investmentChart');
+    if (investmentChartContainer) {
+        loadInvestmentChart();
+    }
+    
+    // إعداد الرسم البياني للأرباح
+    const profitsChartContainer = document.getElementById('profitsChart');
+    if (profitsChartContainer) {
+        loadProfitChart();
+    }
+    
+    // إعداد الرسم البياني للأداء
+    const performanceChartContainer = document.getElementById('performanceChart');
+    if (performanceChartContainer) {
+        loadPerformanceChart();
+    }
+    
+    // إعداد الرسم البياني المالي
+    const financialChartContainer = document.getElementById('financialChart');
+    if (financialChartContainer) {
+        loadFinancialChart();
+    }
+}
+
+/**
+ * تحميل الرسم البياني للأداء
+ */
+function loadPerformanceChart() {
+    const chartData = generateChartData('monthly');
+    
+    // إنشاء تكوين الرسم البياني
+    const config = {
+        type: 'line',
+        datasets: [
+            {
+                label: 'معدل النمو',
+                data: chartData.map((d, i) => {
+                    if (i === 0) return 0;
+                    const prevTotal = chartData[i-1].investments;
+                    const currentTotal = d.investments;
+                    return prevTotal > 0 ? ((currentTotal - prevTotal) / prevTotal) * 100 : 0;
+                }),
+                borderColor: '#9b59b6',
+                backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                borderWidth: 2,
+                fill: true
+            },
+            {
+                label: 'إجمالي الاستثمارات',
+                data: chartData.map(d => d.investments),
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 2,
+                fill: true
+            },
+            {
+                label: 'إجمالي الأرباح',
+                data: chartData.map(d => d.profits),
+                borderColor: '#2ecc71',
+                backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                borderWidth: 2,
+                fill: true
+            }
+        ]
+    };
+    
+    // تحميل الرسم البياني
+    loadChart('performanceChart', chartData, config);
+    
+    // تحديث بطاقات الأداء
+    updatePerformanceCards(chartData);
+}
+
+/**
+ * تحميل الرسم البياني المالي
+ */
+function loadFinancialChart() {
+    const chartData = generateChartData('monthly');
+    
+    // إنشاء تكوين الرسم البياني
+    const config = {
+        type: 'bar',
+        datasets: [
+            {
+                label: 'الإيرادات',
+                data: chartData.map(d => d.investments),
+                backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                borderColor: '#3498db',
+                borderWidth: 1
+            },
+            {
+                label: 'المصروفات',
+                data: chartData.map(d => d.profits * 0.3), // تقدير المصروفات بنسبة 30% من الأرباح
+                backgroundColor: 'rgba(231, 76, 60, 0.6)',
+                borderColor: '#e74c3c',
+                borderWidth: 1
+            },
+            {
+                label: 'صافي الربح',
+                data: chartData.map(d => d.profits * 0.7), // صافي الربح بعد خصم المصروفات
+                backgroundColor: 'rgba(46, 204, 113, 0.6)',
+                borderColor: '#2ecc71',
+                borderWidth: 1
+            }
+        ]
+    };
+    
+    // تحميل الرسم البياني
+    loadChart('financialChart', chartData, config);
+    
+    // تحديث البيانات المالية
+    updateFinancialData(chartData);
+}
+
+/**
+ * تحديث بطاقات الأداء
+ */
+function updatePerformanceCards(chartData) {
+    // تحديث معدل النمو الشهري
+    const monthlyGrowthRate = document.getElementById('monthlyGrowthRate');
+    if (monthlyGrowthRate) {
+        // حساب متوسط معدل النمو
+        let growthRateSum = 0;
+        let growthRateCount = 0;
+        
+        for (let i = 1; i < chartData.length; i++) {
+            const prevTotal = chartData[i-1].investments;
+            const currentTotal = chartData[i].investments;
+            
+            if (prevTotal > 0) {
+                const growthRate = ((currentTotal - prevTotal) / prevTotal) * 100;
+                growthRateSum += growthRate;
+                growthRateCount++;
+            }
+        }
+        
+        const averageGrowthRate = growthRateCount > 0 ? growthRateSum / growthRateCount : 0;
+        monthlyGrowthRate.textContent = averageGrowthRate.toFixed(2) + '%';
+    }
+    
+    // تحديث متوسط الاستثمار
+    const averageInvestment = document.getElementById('averageInvestment');
+    if (averageInvestment) {
+        // حساب متوسط مبلغ الاستثمار
+        const totalInvestments = investments.reduce((sum, inv) => sum + inv.amount, 0);
+        const average = investments.length > 0 ? totalInvestments / investments.length : 0;
+        
+        averageInvestment.textContent = formatCurrency(average.toFixed(0));
+    }
+    
+    // تحديث نسبة الاحتفاظ
+    const retentionRate = document.getElementById('retentionRate');
+    if (retentionRate) {
+        // حساب نسبة الاحتفاظ (نسبة الاستثمارات النشطة إلى إجمالي الاستثمارات)
+        const activeInvestments = investments.filter(inv => inv.status === 'active').length;
+        const totalInvestments = investments.length;
+        
+        const retention = totalInvestments > 0 ? (activeInvestments / totalInvestments) * 100 : 0;
+        retentionRate.textContent = retention.toFixed(2) + '%';
+        
+        // تحديث اتجاه التغيير
+        const retentionRateChangeContainer = document.getElementById('retentionRateChangeContainer');
+        const retentionRateChangeIcon = document.getElementById('retentionRateChangeIcon');
+        const retentionRateChange = document.getElementById('retentionRateChange');
+        
+        if (retentionRateChangeContainer && retentionRateChangeIcon && retentionRateChange) {
+            // افتراض أن نسبة الاحتفاظ مستقرة أو في تحسن
+            retentionRateChangeContainer.className = 'card-change up';
+            retentionRateChangeIcon.className = 'fas fa-arrow-up';
+            retentionRateChange.textContent = '0% من الشهر السابق';
+        }
+    }
+    
+    // تحديث إجمالي العائد
+    const totalReturn = document.getElementById('totalReturn');
+    if (totalReturn) {
+        // حساب إجمالي العائد (إجمالي الأرباح)
+        const today = new Date();
+        let totalProfit = 0;
+        
+        investments
+            .filter(inv => inv.status === 'active')
+            .forEach(inv => {
+                const profit = calculateProfit(inv.amount, inv.date, today.toISOString());
+                totalProfit += profit;
+            });
+        
+        totalReturn.textContent = formatCurrency(totalProfit.toFixed(2));
+    }
+}
+
+/**
+ * تحديث البيانات المالية
+ */
+function updateFinancialData(chartData) {
+    // حساب إجمالي الدخل (إجمالي الاستثمارات)
+    const totalIncome = document.getElementById('totalIncome');
+    if (totalIncome) {
+        const income = investments.reduce((sum, inv) => sum + inv.amount, 0);
+        totalIncome.textContent = formatCurrency(income);
+    }
+    
+    // حساب إجمالي المصروفات (تقدير: 30% من الأرباح)
+    const totalExpenses = document.getElementById('totalExpenses');
+    if (totalExpenses) {
+        // حساب إجمالي الأرباح
+        const today = new Date();
+        let totalProfit = 0;
+        
+        investments
+            .filter(inv => inv.status === 'active')
+            .forEach(inv => {
+                const profit = calculateProfit(inv.amount, inv.date, today.toISOString());
+                totalProfit += profit;
+            });
+        
+        // تقدير المصروفات
+        const expenses = totalProfit * 0.3;
+        totalExpenses.textContent = formatCurrency(expenses.toFixed(2));
+    }
+    
+    // حساب صافي الربح (إجمالي الأرباح - إجمالي المصروفات)
+    const netProfit = document.getElementById('netProfit');
+    if (netProfit) {
+        // حساب إجمالي الأرباح
+        const today = new Date();
+        let totalProfit = 0;
+        
+        investments
+            .filter(inv => inv.status === 'active')
+            .forEach(inv => {
+                const profit = calculateProfit(inv.amount, inv.date, today.toISOString());
+                totalProfit += profit;
+            });
+        
+        // حساب صافي الربح
+        const expenses = totalProfit * 0.3;
+        const net = totalProfit - expenses;
+        netProfit.textContent = formatCurrency(net.toFixed(2));
+    }
+    
+    // حساب الرصيد الحالي (افتراضي)
+    const currentBalance = document.getElementById('currentBalance');
+    if (currentBalance) {
+        // حساب إجمالي الاستثمارات
+        const totalInvestments = investments.reduce((sum, inv) => sum + inv.amount, 0);
+        
+        // حساب إجمالي السحوبات
+        const totalWithdrawals = operations
+            .filter(op => op.type === 'withdrawal' && op.status === 'active')
+            .reduce((sum, op) => sum + op.amount, 0);
+        
+        // حساب الرصيد الحالي
+        const balance = totalInvestments - totalWithdrawals;
+        currentBalance.textContent = formatCurrency(balance);
+    }
+    
+    // تحديث جدول ملخص الدخل
+    const incomeTableBody = document.getElementById('incomeTableBody');
+    if (incomeTableBody) {
+        // حساب إجمالي الاستثمارات
+        const totalInvestments = investments.reduce((sum, inv) => sum + inv.amount, 0);
+        
+        // حساب إجمالي السحوبات
+        const totalWithdrawals = operations
+            .filter(op => op.type === 'withdrawal' && op.status === 'active')
+            .reduce((sum, op) => sum + op.amount, 0);
+        
+        // حساب إجمالي الأرباح
+        const today = new Date();
+        let totalProfit = 0;
+        
+        investments
+            .filter(inv => inv.status === 'active')
+            .forEach(inv => {
+                const profit = calculateProfit(inv.amount, inv.date, today.toISOString());
+                totalProfit += profit;
+            });
+        
+        // حساب إجمالي الأرباح المدفوعة
+        const totalPaidProfit = operations
+            .filter(op => op.type === 'profit' && op.status === 'active')
+            .reduce((sum, op) => sum + op.amount, 0);
+        
+        // تحديث الجدول
+        incomeTableBody.innerHTML = `
+            <tr>
+                <td>إجمالي الاستثمارات</td>
+                <td>${formatCurrency(totalInvestments)}</td>
+                <td><span class="status active">+</span></td>
+            </tr>
+            <tr>
+                <td>إجمالي السحوبات</td>
+                <td>${formatCurrency(totalWithdrawals)}</td>
+                <td><span class="status pending">-</span></td>
+            </tr>
+            <tr>
+                <td>إجمالي الأرباح</td>
+                <td>${formatCurrency(totalProfit.toFixed(2))}</td>
+                <td><span class="status active">+</span></td>
+            </tr>
+            <tr>
+                <td>الأرباح المدفوعة</td>
+                <td>${formatCurrency(totalPaidProfit.toFixed(2))}</td>
+                <td><span class="status pending">-</span></td>
+            </tr>
+            <tr>
+                <td><strong>صافي الدخل</strong></td>
+                <td><strong>${formatCurrency((totalInvestments - totalWithdrawals + totalProfit - totalPaidProfit).toFixed(2))}</strong></td>
+                <td></td>
+            </tr>
+        `;
+    }
+}
+
+/**
+ * إنشاء تقرير مالي مخصص
+ */
+function generateFinancialReport(event) {
+    if (event) event.preventDefault();
+    
+    // الحصول على قيم النموذج
+    const reportType = document.getElementById('financialReportType').value;
+    const reportPeriod = document.getElementById('financialReportPeriod').value;
+    
+    let fromDate, toDate;
+    
+    if (reportPeriod === 'custom') {
+        fromDate = document.getElementById('financialFromDate').value;
+        toDate = document.getElementById('financialToDate').value;
+        
+        if (!fromDate || !toDate) {
+            createNotification('خطأ', 'يرجى تحديد الفترة الزمنية', 'danger');
+            return;
+        }
+    } else {
+        // تحديد الفترة الزمنية بناءً على الاختيار
+        const today = new Date();
+        toDate = today.toISOString().split('T')[0];
+        
+        switch (reportPeriod) {
+            case 'daily':
+                // اليوم الحالي
+                fromDate = toDate;
+                break;
+            case 'weekly':
+                // الأسبوع الحالي
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - today.getDay());
+                fromDate = weekStart.toISOString().split('T')[0];
+                break;
+            case 'monthly':
+                // الشهر الحالي
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                fromDate = monthStart.toISOString().split('T')[0];
+                break;
+            case 'quarterly':
+                // الربع الحالي
+                const quarter = Math.floor(today.getMonth() / 3);
+                const quarterStart = new Date(today.getFullYear(), quarter * 3, 1);
+                fromDate = quarterStart.toISOString().split('T')[0];
+                break;
+            case 'yearly':
+                // السنة الحالية
+                const yearStart = new Date(today.getFullYear(), 0, 1);
+                fromDate = yearStart.toISOString().split('T')[0];
+                break;
+            default:
+                // الشهر الحالي كإعداد افتراضي
+                const defaultMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                fromDate = defaultMonthStart.toISOString().split('T')[0];
+        }
+    }
+    
+    // إنشاء تقرير بناءً على النوع
+    let reportTitle, reportContent;
+    
+    switch (reportType) {
+        case 'income':
+            reportTitle = 'تقرير الدخل';
+            reportContent = generateIncomeReportContent(fromDate, toDate);
+            break;
+        case 'expense':
+            reportTitle = 'تقرير المصروفات';
+            reportContent = generateExpenseReportContent(fromDate, toDate);
+            break;
+        case 'cashflow':
+            reportTitle = 'تقرير التدفق النقدي';
+            reportContent = generateCashflowReportContent(fromDate, toDate);
+            break;
+        case 'profit':
+            reportTitle = 'تقرير الأرباح والخسائر';
+            reportContent = generateProfitLossReportContent(fromDate, toDate);
+            break;
+        case 'balance':
+            reportTitle = 'تقرير الميزانية';
+            reportContent = generateBalanceReportContent(fromDate, toDate);
+            break;
+        default:
+            createNotification('خطأ', 'يرجى اختيار نوع التقرير', 'danger');
+            return;
+    }
+    
+    // إنشاء التقرير
+    const report = {
+        id: generateId(),
+        title: reportTitle,
+        type: reportType,
+        fromDate,
+        toDate,
+        period: reportPeriod,
+        content: reportContent,
+        createdAt: new Date().toISOString(),
+        createdBy: 'admin',
+    };
+    
+    // إضافة التقرير إلى قائمة التقارير
+    reports.push(report);
+    
+    // حفظ التقارير
+    saveReports();
+    
+    // عرض التقرير
+    displayFinancialReport(report);
+    
+    // إظهار رسالة نجاح
+    createNotification('نجاح', 'تم إنشاء التقرير بنجاح', 'success');
+}
+
+/**
+ * إنشاء محتوى تقرير الدخل
+ */
+function generateIncomeReportContent(fromDate, toDate) {
+    // تحويل التواريخ إلى كائنات Date
+    const startDate = new Date(fromDate);
+    const endDate = new Date(toDate);
+    
+    // تعيين نهاية اليوم لتاريخ الانتهاء
+    endDate.setHours(23, 59, 59, 999);
+    
+    // الحصول على الاستثمارات في الفترة المحددة
+    const periodInvestments = investments.filter(inv => {
+        const invDate = new Date(inv.date);
+        return invDate >= startDate && invDate <= endDate;
+    });
+    
+    // حساب إجمالي الاستثمارات في الفترة
+    const totalInvestments = periodInvestments.reduce((sum, inv) => sum + inv.amount, 0);
+    
+    // الحصول على عمليات الأرباح في الفترة المحددة
+    const periodProfits = operations.filter(op => {
+        const opDate = new Date(op.date);
+        return op.type === 'profit' && op.status === 'active' && opDate >= startDate && opDate <= endDate;
+    });
+    
+    // حساب إجمالي الأرباح المدفوعة في الفترة
+    const totalPaidProfits = periodProfits.reduce((sum, op) => sum + op.amount, 0);
+    
+    // تجميع الاستثمارات حسب المستثمر
+    const investorTotals = {};
+    
+    periodInvestments.forEach(inv => {
+        if (!investorTotals[inv.investorId]) {
+            investorTotals[inv.investorId] = 0;
+        }
+        
+        investorTotals[inv.investorId] += inv.amount;
+    });
+    
+    // إنشاء جدول بيانات الدخل
+    let tableContent = `
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>البند</th>
+                    <th>المبلغ</th>
+                    <th>النسبة</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>إجمالي الاستثمارات</td>
+                    <td>${formatCurrency(totalInvestments)}</td>
+                    <td>100%</td>
+                </tr>
+    `;
+    
+    // إضافة تفاصيل الاستثمارات حسب المستثمر
+    for (const investorId in investorTotals) {
+        const investor = investors.find(inv => inv.id === investorId);
+        const investorName = investor ? investor.name : 'مستثمر غير معروف';
+        const investorAmount = investorTotals[investorId];
+        const percentage = (investorAmount / totalInvestments * 100).toFixed(2);
+        
+        tableContent += `
+            <tr>
+                <td>${investorName}</td>
+                <td>${formatCurrency(investorAmount)}</td>
+                <td>${percentage}%</td>
+            </tr>
+        `;
+    }
+    
+    // إضافة معلومات الأرباح المدفوعة
+    tableContent += `
+            <tr>
+                <td>إجمالي الأرباح المدفوعة</td>
+                <td>${formatCurrency(totalPaidProfits)}</td>
+                <td>${totalInvestments > 0 ? (totalPaidProfits / totalInvestments * 100).toFixed(2) : 0}%</td>
+            </tr>
+        </tbody>
+    </table>
+    `;
+    
+    // إنشاء رسم بياني للدخل
+    const chartData = `
+        <div style="height: 300px; margin-top: 20px;" id="incomeReportChart"></div>
+        <script>
+            const incomeData = [
+                { label: 'الاستثمارات', value: ${totalInvestments} },
+                { label: 'الأرباح المدفوعة', value: ${totalPaidProfits} }
+            ];
+            
+            const incomeCtx = document.getElementById('incomeReportChart').getContext('2d');
+            
+            new Chart(incomeCtx, {
+                type: 'bar',
+                data: {
+                    labels: incomeData.map(d => d.label),
+                    datasets: [{
+                        label: 'المبلغ',
+                        data: incomeData.map(d => d.value),
+                        backgroundColor: [
+                            'rgba(52, 152, 219, 0.6)',
+                            'rgba(46, 204, 113, 0.6)'
+                        ],
+                        borderColor: [
+                            '#3498db',
+                            '#2ecc71'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatNumber(value) + ' ' + settings.currency;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + formatCurrency(context.raw);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        </script>
+    `;
+    
+    // إنشاء محتوى التقرير الكامل
+    const content = `
+        <div class="report-header">
+            <h2>تقرير الدخل</h2>
+            <p>الفترة: ${formatDate(fromDate)} - ${formatDate(toDate)}</p>
+        </div>
+        
+        <div class="report-summary">
+            <div class="dashboard-cards">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">إجمالي الاستثمارات</div>
+                            <div class="card-value">${formatCurrency(totalInvestments)}</div>
+                        </div>
+                        <div class="card-icon primary">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">إجمالي الأرباح المدفوعة</div>
+                            <div class="card-value">${formatCurrency(totalPaidProfits)}</div>
+                        </div>
+                        <div class="card-icon success">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">عدد الاستثمارات</div>
+                            <div class="card-value">${periodInvestments.length}</div>
+                        </div>
+                        <div class="card-icon info">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">عدد المستثمرين</div>
+                            <div class="card-value">${Object.keys(investorTotals).length}</div>
+                        </div>
+                        <div class="card-icon warning">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="report-details">
+            <h3>تفاصيل الدخل</h3>
+            ${tableContent}
+        </div>
+        
+        <div class="report-chart">
+            <h3>تحليل الدخل</h3>
+            ${chartData}
+        </div>
+    `;
+    
+    return content;
+}
+
+/**
+ * إنشاء محتوى تقرير المصروفات
+ */
+function generateExpenseReportContent(fromDate, toDate) {
+    // سيتم تنفيذ هذه الوظيفة بشكل مشابه لتقرير الدخل ولكن للمصروفات
+    // بما أن النظام لا يتتبع المصروفات بشكل مباشر، سنفترض أن المصروفات هي دفعات الأرباح
+    
+    // تحويل التواريخ إلى كائنات Date
+    const startDate = new Date(fromDate);
+    const endDate = new Date(toDate);
+    
+    // تعيين نهاية اليوم لتاريخ الانتهاء
+    endDate.setHours(23, 59, 59, 999);
+    
+    // الحصول على عمليات دفع الأرباح في الفترة المحددة
+    const periodProfits = operations.filter(op => {
+        const opDate = new Date(op.date);
+        return op.type === 'profit' && op.status === 'active' && opDate >= startDate && opDate <= endDate;
+    });
+    
+    // حساب إجمالي الأرباح المدفوعة في الفترة
+    const totalPaidProfits = periodProfits.reduce((sum, op) => sum + op.amount, 0);
+    
+    // افتراض 30% من الأرباح المدفوعة كمصروفات تشغيلية
+    const operatingExpenses = totalPaidProfits * 0.3;
+    
+    // محتوى بسيط للتقرير
+    const content = `
+        <div class="report-header">
+            <h2>تقرير المصروفات</h2>
+            <p>الفترة: ${formatDate(fromDate)} - ${formatDate(toDate)}</p>
+        </div>
+        
+        <div class="report-summary">
+            <div class="dashboard-cards">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">إجمالي المصروفات</div>
+                            <div class="card-value">${formatCurrency(totalPaidProfits)}</div>
+                        </div>
+                        <div class="card-icon danger">
+                            <i class="fas fa-file-invoice"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">المصروفات التشغيلية</div>
+                            <div class="card-value">${formatCurrency(operatingExpenses.toFixed(2))}</div>
+                        </div>
+                        <div class="card-icon warning">
+                            <i class="fas fa-tools"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="report-details">
+            <h3>تفاصيل المصروفات</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>البند</th>
+                        <th>المبلغ</th>
+                        <th>النسبة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>دفعات الأرباح</td>
+                        <td>${formatCurrency(totalPaidProfits)}</td>
+                        <td>70%</td>
+                    </tr>
+                    <tr>
+                        <td>مصروفات تشغيلية</td>
+                        <td>${formatCurrency(operatingExpenses.toFixed(2))}</td>
+                        <td>30%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    return content;
+}
+
+/**
+ * إنشاء محتوى تقرير التدفق النقدي
+ */
+function generateCashflowReportContent(fromDate, toDate) {
+    // سيتم تنفيذ هذه الوظيفة لتقرير التدفق النقدي
+    const content = `
+        <div class="report-header">
+            <h2>تقرير التدفق النقدي</h2>
+            <p>الفترة: ${formatDate(fromDate)} - ${formatDate(toDate)}</p>
+        </div>
+        
+        <div class="report-note">
+            <div class="alert alert-info">
+                <div class="alert-icon">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="alert-content">
+                    <div class="alert-title">ملاحظة</div>
+                    <div class="alert-text">تم تنفيذ تقرير التدفق النقدي بشكل مبسط. يرجى ملاحظة أن البيانات المعروضة هي تقديرية.</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="report-details">
+            <h3>ملخص التدفق النقدي</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>البند</th>
+                        <th>المبلغ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>رصيد بداية الفترة</td>
+                        <td>${formatCurrency(1000000)}</td>
+                    </tr>
+                    <tr>
+                        <td>التدفق النقدي من الأنشطة التشغيلية</td>
+                        <td>${formatCurrency(500000)}</td>
+                    </tr>
+                    <tr>
+                        <td>التدفق النقدي من الأنشطة الاستثمارية</td>
+                        <td>${formatCurrency(300000)}</td>
+                    </tr>
+                    <tr>
+                        <td>التدفق النقدي من الأنشطة التمويلية</td>
+                        <td>${formatCurrency(200000)}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>رصيد نهاية الفترة</strong></td>
+                        <td><strong>${formatCurrency(2000000)}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    return content;
+}
+
+/**
+ * إنشاء محتوى تقرير الأرباح والخسائر
+ */
+function generateProfitLossReportContent(fromDate, toDate) {
+    // سيتم تنفيذ هذه الوظيفة لتقرير الأرباح والخسائر
+    const content = `
+        <div class="report-header">
+            <h2>تقرير الأرباح والخسائر</h2>
+            <p>الفترة: ${formatDate(fromDate)} - ${formatDate(toDate)}</p>
+        </div>
+        
+        <div class="report-note">
+            <div class="alert alert-info">
+                <div class="alert-icon">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="alert-content">
+                    <div class="alert-title">ملاحظة</div>
+                    <div class="alert-text">تم تنفيذ تقرير الأرباح والخسائر بشكل مبسط. يرجى ملاحظة أن البيانات المعروضة هي تقديرية.</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="report-details">
+            <h3>ملخص الأرباح والخسائر</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>البند</th>
+                        <th>المبلغ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>الإيرادات</td>
+                        <td>${formatCurrency(1500000)}</td>
+                    </tr>
+                    <tr>
+                        <td>تكلفة الإيرادات</td>
+                        <td>${formatCurrency(500000)}</td>
+                    </tr>
+                    <tr>
+                        <td>إجمالي الربح</td>
+                        <td>${formatCurrency(1000000)}</td>
+                    </tr>
+                    <tr>
+                        <td>المصروفات التشغيلية</td>
+                        <td>${formatCurrency(300000)}</td>
+                    </tr>
+                    <tr>
+                        <td>مصروفات البيع والتسويق</td>
+                        <td>${formatCurrency(150000)}</td>
+                    </tr>
+                    <tr>
+                        <td>المصروفات الإدارية</td>
+                        <td>${formatCurrency(100000)}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>صافي الربح</strong></td>
+                        <td><strong>${formatCurrency(450000)}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    return content;
+}
+
+/**
+ * إنشاء محتوى تقرير الميزانية
+ */
+function generateBalanceReportContent(fromDate, toDate) {
+    // سيتم تنفيذ هذه الوظيفة لتقرير الميزانية
+    const content = `
+        <div class="report-header">
+            <h2>تقرير الميزانية</h2>
+            <p>الفترة: ${formatDate(fromDate)} - ${formatDate(toDate)}</p>
+        </div>
+        
+        <div class="report-note">
+            <div class="alert alert-info">
+                <div class="alert-icon">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="alert-content">
+                    <div class="alert-title">ملاحظة</div>
+                    <div class="alert-text">تم تنفيذ تقرير الميزانية بشكل مبسط. يرجى ملاحظة أن البيانات المعروضة هي تقديرية.</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="report-details">
+            <h3>ملخص الميزانية</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>البند</th>
+                        <th>المبلغ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="2"><strong>الأصول</strong></td>
+                    </tr>
+                    <tr>
+                        <td>الأصول المتداولة</td>
+                        <td>${formatCurrency(3000000)}</td>
+                    </tr>
+                    <tr>
+                        <td>الأصول الثابتة</td>
+                        <td>${formatCurrency(2000000)}</td>
+                    </tr>
+                    <tr>
+                        <td>إجمالي الأصول</td>
+                        <td>${formatCurrency(5000000)}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>الالتزامات وحقوق الملكية</strong></td>
+                    </tr>
+                    <tr>
+                        <td>الالتزامات المتداولة</td>
+                        <td>${formatCurrency(1000000)}</td>
+                    </tr>
+                    <tr>
+                        <td>الالتزامات طويلة الأجل</td>
+                        <td>${formatCurrency(1500000)}</td>
+                    </tr>
+                    <tr>
+                        <td>حقوق الملكية</td>
+                        <td>${formatCurrency(2500000)}</td>
+                    </tr>
+                    <tr>
+                        <td>إجمالي الالتزامات وحقوق الملكية</td>
+                        <td>${formatCurrency(5000000)}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    return content;
+}
+
+/**
+ * عرض التقرير المالي
+ */
+function displayFinancialReport(report) {
+    // إظهار علامة تبويب التقارير
+    showPage('reports');
+    
+    // إظهار نتيجة التقرير
+    const reportResult = document.getElementById('reportResult');
+    const reportTitle = document.getElementById('reportTitle');
+    const reportContent = document.getElementById('reportContent');
+    
+    if (reportResult && reportTitle && reportContent) {
+        reportResult.style.display = 'block';
+        reportTitle.textContent = report.title;
+        reportContent.innerHTML = report.content;
+    }
+}
+
+/**
+ * إنشاء تقرير مخصص
+ */
+function createCustomReport(event) {
+    if (event) event.preventDefault();
+    
+    // الحصول على قيم النموذج
+    const reportType = document.getElementById('reportType').value;
+    const reportInvestor = document.getElementById('reportInvestor').value;
+    const reportFromDate = document.getElementById('reportFromDate').value;
+    const reportToDate = document.getElementById('reportToDate').value;
+    const reportFormat = document.querySelector('input[name="reportFormat"]:checked').value;
+    
+    // التحقق من صحة البيانات
+    if (!reportType) {
+        createNotification('خطأ', 'يرجى اختيار نوع التقرير', 'danger');
+        return;
+    }
+    
+    // إنشاء عنوان التقرير
+    let reportTitle;
+    
+    switch (reportType) {
+        case 'investors':
+            reportTitle = 'تقرير المستثمرين';
+            break;
+        case 'investments':
+            reportTitle = 'تقرير الاستثمارات';
+            break;
+        case 'profits':
+            reportTitle = 'تقرير الأرباح';
+            break;
+        case 'operations':
+            reportTitle = 'تقرير العمليات';
+            break;
+        case 'financial':
+            reportTitle = 'التقرير المالي';
+            break;
+        case 'summary':
+            reportTitle = 'التقرير العام';
+            break;
+        default:
+            reportTitle = 'تقرير مخصص';
+    }
+    
+    // إضافة اسم المستثمر إلى عنوان التقرير إذا كان محدداً
+    if (reportInvestor) {
+        const investor = investors.find(inv => inv.id === reportInvestor);
+        if (investor) {
+            reportTitle += ` - ${investor.name}`;
+        }
+    }
+    
+    // إضافة الفترة الزمنية إلى عنوان التقرير إذا كانت محددة
+    if (reportFromDate && reportToDate) {
+        reportTitle += ` (${formatDate(reportFromDate)} - ${formatDate(reportToDate)})`;
+    }
+    
+    // إنشاء محتوى التقرير بناءً على النوع والتنسيق
+    let reportContent;
+    
+    switch (reportType) {
+        case 'investors':
+            reportContent = generateInvestorsReportContent(reportInvestor, reportFromDate, reportToDate, reportFormat);
+            break;
+        case 'investments':
+            reportContent = generateInvestmentsReportContent(reportInvestor, reportFromDate, reportToDate, reportFormat);
+            break;
+        case 'profits':
+            reportContent = generateProfitsReportContent(reportInvestor, reportFromDate, reportToDate, reportFormat);
+            break;
+        case 'operations':
+            reportContent = generateOperationsReportContent(reportInvestor, reportFromDate, reportToDate, reportFormat);
+            break;
+        case 'financial':
+            reportContent = generateFinancialReportContent(reportFromDate, reportToDate, reportFormat);
+            break;
+        case 'summary':
+            reportContent = generateSummaryReportContent(reportInvestor, reportFromDate, reportToDate, reportFormat);
+            break;
+        default:
+            createNotification('خطأ', 'نوع التقرير غير صالح', 'danger');
+            return;
+    }
+    
+    // إنشاء التقرير
+    const report = {
+        id: generateId(),
+        title: reportTitle,
+        type: reportType,
+        investorId: reportInvestor,
+        fromDate: reportFromDate,
+        toDate: reportToDate,
+        format: reportFormat,
+        content: reportContent,
+        createdAt: new Date().toISOString(),
+        createdBy: 'admin',
+    };
+    
+    // إضافة التقرير إلى قائمة التقارير
+    reports.push(report);
+    
+    // حفظ التقارير
+    saveReports();
+    
+    // عرض التقرير
+    displayReport(report);
+    
+    // إظهار رسالة نجاح
+    createNotification('نجاح', 'تم إنشاء التقرير بنجاح', 'success');
+}
+
+/**
+ * عرض التقرير
+ */
+function displayReport(report) {
+    // إظهار نتيجة التقرير
+    const reportResult = document.getElementById('reportResult');
+    const reportTitle = document.getElementById('reportTitle');
+    const reportContent = document.getElementById('reportContent');
+    
+    if (reportResult && reportTitle && reportContent) {
+        reportResult.style.display = 'block';
+        reportTitle.textContent = report.title;
+        reportContent.innerHTML = report.content;
+    }
+}
+
+/**
+ * إغلاق التقرير
+ */
+function closeReport() {
+    const reportResult = document.getElementById('reportResult');
+    if (reportResult) {
+        reportResult.style.display = 'none';
+    }
+}
+
+/**
+ * حفظ التقرير الحالي
+ */
+function saveReport() {
+    // التحقق من وجود تقرير حالي
+    const reportTitle = document.getElementById('reportTitle');
+    const reportContent = document.getElementById('reportContent');
+    
+    if (!reportTitle || !reportContent) {
+        createNotification('خطأ', 'لا يوجد تقرير لحفظه', 'danger');
+        return;
+    }
+    
+    // البحث عن التقرير في قائمة التقارير المحفوظة
+    const existingReport = reports.find(report => report.title === reportTitle.textContent);
+    
+    if (existingReport) {
+        // تحديث التقرير الموجود
+        existingReport.updatedAt = new Date().toISOString();
+        
+        // إظهار رسالة نجاح
+        createNotification('نجاح', 'تم تحديث التقرير بنجاح', 'success');
+    } else {
+        // إنشاء تقرير جديد
+        const newReport = {
+            id: generateId(),
+            title: reportTitle.textContent,
+            content: reportContent.innerHTML,
+            createdAt: new Date().toISOString(),
+            createdBy: 'admin',
+        };
+        
+        // إضافة التقرير إلى قائمة التقارير
+        reports.push(newReport);
+        
+        // إظهار رسالة نجاح
+        createNotification('نجاح', 'تم حفظ التقرير بنجاح', 'success');
+    }
+    
+    // حفظ التقارير
+    saveReports();
+    
+    // تحديث قائمة التقارير
+    loadReports();
+}
+
+/**
+ * تحميل التقارير
+ */
+function loadReports() {
+    // تحميل التقارير الأخيرة
+    loadRecentReports();
+}
+
+/**
+ * تحميل التقارير الأخيرة
+ */
+function loadRecentReports() {
+    const tableBody = document.getElementById('recentReportsTableBody');
+    if (!tableBody) return;
+    
+    // ترتيب التقارير حسب تاريخ الإنشاء (الأحدث أولاً)
+    const sortedReports = [...reports].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    // عرض التقارير الأخيرة (أقصى 10 تقارير)
+    const recentReports = sortedReports.slice(0, 10);
+    
+    if (recentReports.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">لا توجد تقارير</td></tr>`;
+        return;
+    }
+    
+    tableBody.innerHTML = '';
+    
+    recentReports.forEach(report => {
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+            <td>${report.title}</td>
+            <td>${report.type || 'غير محدد'}</td>
+            <td>${formatDate(report.createdAt)} ${formatTime(report.createdAt)}</td>
+            <td>${report.createdBy || 'غير محدد'}</td>
+            <td>
+                <button class="btn btn-info btn-icon action-btn" onclick="viewReport('${report.id}')">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-primary btn-icon action-btn" onclick="generatePdfReport('${report.id}')">
+                    <i class="fas fa-file-pdf"></i>
+                </button>
+                <button class="btn btn-danger btn-icon action-btn" onclick="openDeleteConfirmationModal('${report.id}', 'report')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+}
+
+/**
+ * عرض تقرير موجود
+ */
+function viewReport(reportId) {
+    // البحث عن التقرير
+    const report = reports.find(r => r.id === reportId);
+    
+    if (!report) {
+        createNotification('خطأ', 'التقرير غير موجود', 'danger');
+        return;
+    }
+    
+    // عرض التقرير
+    displayReport(report);
+}
+
+/**
+ * إنشاء ملف PDF للتقرير
+ */
+function generatePdfReport(reportId) {
+    // البحث عن التقرير
+    const report = reports.find(r => r.id === reportId);
+    
+    if (!report) {
+        createNotification('خطأ', 'التقرير غير موجود', 'danger');
+        return;
+    }
+    
+    // إظهار رسالة معلومات
+    createNotification('معلومات', 'وظيفة إنشاء ملف PDF غير متاحة حالياً', 'info');
+}
+
+/**
+ * حذف تقرير
+ */
+function deleteReport(reportId) {
+    // البحث عن التقرير
+    const report = reports.find(r => r.id === reportId);
+    
+    if (!report) {
+        createNotification('خطأ', 'التقرير غير موجود', 'danger');
+        return;
+    }
+    
+    // حذف التقرير
+    reports = reports.filter(r => r.id !== reportId);
+    
+    // حفظ التقارير
+    saveReports();
+    
+    // تحديث قائمة التقارير
+    loadReports();
+    
+    // إغلاق التقرير المعروض إذا كان هو نفسه
+    const reportResult = document.getElementById('reportResult');
+    const reportTitle = document.getElementById('reportTitle');
+    
+    if (reportResult && reportTitle && reportTitle.textContent === report.title) {
+        reportResult.style.display = 'none';
+    }
+    
+    // إظهار رسالة نجاح
+    createNotification('نجاح', 'تم حذف التقرير بنجاح', 'success');
+}
+
+// تصدير الدوال المطلوبة
+window.firebaseApp = window.firebaseApp || {};
+window.createFirebaseBackupFromSettings = function() {
+    window.firebaseApp.createBackup();
+};
+
+// تحديث عرض حالة المزامنة
+function updateSyncStatus(status, type) {
+    const syncStatusElement = document.getElementById('syncStatus');
+    if (syncStatusElement) {
+        syncStatusElement.textContent = status;
+        syncStatusElement.style.display = 'inline-block';
+        syncStatusElement.className = `status ${type}`;
+    }
+    
+    // تحديث أيقونة المزامنة
+    const syncIcon = document.getElementById('syncIcon');
+    if (syncIcon) {
+        syncIcon.className = `sync-btn ${type}`;
+    }
+}
