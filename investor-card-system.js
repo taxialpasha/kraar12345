@@ -4353,3 +4353,1569 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log("✅ تم تطبيق جميع الإصلاحات بنجاح");
 });
+
+// نظام استعادة وإصلاح بطاقات المستثمرين الشامل
+// يعالج مشكلة عدم القدرة على إضافة بطاقات جديدة واستعادة البطاقات المفقودة
+
+// ============= القسم 1: وظائف التشخيص واستعادة البيانات =============
+
+// استعادة البطاقات من جميع مصادر التخزين المحتملة
+async function recoverAllCards() {
+    console.log("🔄 بدء عملية استعادة جميع البطاقات من كافة المصادر...");
+    
+    let recoveredCards = [];
+    
+    // 1. محاولة استرداد البطاقات من localStorage
+    try {
+        const localCards = localStorage.getItem('investorCards');
+        if (localCards) {
+            const parsedLocalCards = JSON.parse(localCards);
+            if (Array.isArray(parsedLocalCards)) {
+                console.log(`✅ تم العثور على ${parsedLocalCards.length} بطاقة في التخزين المحلي`);
+                recoveredCards = recoveredCards.concat(parsedLocalCards);
+            }
+        }
+    } catch (error) {
+        console.error("❌ خطأ في استرداد البطاقات من التخزين المحلي:", error);
+    }
+    
+    // 2. محاولة استرداد البطاقات من Firebase إذا كان متاحًا
+    try {
+        if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+            const snapshot = await firebase.database().ref('investorCards').once('value');
+            const firebaseCards = snapshot.val();
+            
+            if (firebaseCards) {
+                const firebaseCardsArray = Object.values(firebaseCards);
+                console.log(`✅ تم العثور على ${firebaseCardsArray.length} بطاقة في Firebase`);
+                
+                // دمج البطاقات مع تجنب التكرار
+                firebaseCardsArray.forEach(fbCard => {
+                    if (!recoveredCards.some(card => card.id === fbCard.id)) {
+                        recoveredCards.push(fbCard);
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error("❌ خطأ في استرداد البطاقات من Firebase:", error);
+    }
+    
+    // 3. البحث عن بطاقات في مصادر التخزين الأخرى بالمتصفح
+    try {
+        // البحث في sessionStorage
+        const sessionCards = sessionStorage.getItem('investorCards');
+        if (sessionCards) {
+            const parsedSessionCards = JSON.parse(sessionCards);
+            if (Array.isArray(parsedSessionCards)) {
+                console.log(`✅ تم العثور على ${parsedSessionCards.length} بطاقة في التخزين المؤقت`);
+                
+                // إضافة البطاقات الفريدة فقط
+                parsedSessionCards.forEach(sCard => {
+                    if (!recoveredCards.some(card => card.id === sCard.id)) {
+                        recoveredCards.push(sCard);
+                    }
+                });
+            }
+        }
+        
+        // البحث في IndexedDB إذا كان متاحًا
+        if ('indexedDB' in window) {
+            const idbPromise = new Promise((resolve) => {
+                const request = indexedDB.open('investmentApp', 1);
+                request.onerror = () => resolve([]);
+                request.onsuccess = function() {
+                    try {
+                        const db = request.result;
+                        if (db.objectStoreNames.contains('investorCards')) {
+                            const transaction = db.transaction(['investorCards'], 'readonly');
+                            const store = transaction.objectStore('investorCards');
+                            const getAll = store.getAll();
+                            
+                            getAll.onsuccess = function() {
+                                const idbCards = getAll.result || [];
+                                console.log(`✅ تم العثور على ${idbCards.length} بطاقة في IndexedDB`);
+                                resolve(idbCards);
+                            };
+                            
+                            getAll.onerror = () => resolve([]);
+                        } else {
+                            resolve([]);
+                        }
+                    } catch (error) {
+                        console.error("خطأ في IndexedDB:", error);
+                        resolve([]);
+                    }
+                };
+            });
+            
+            const idbCards = await idbPromise;
+            
+            // إضافة البطاقات الفريدة من IndexedDB
+            idbCards.forEach(idbCard => {
+                if (!recoveredCards.some(card => card.id === idbCard.id)) {
+                    recoveredCards.push(idbCard);
+                }
+            });
+        }
+    } catch (error) {
+        console.error("❌ خطأ في البحث عن البطاقات في مصادر التخزين الأخرى:", error);
+    }
+    
+    // حفظ البطاقات المستردة في النظام
+    if (recoveredCards.length > 0) {
+        console.log(`✅ تم استرداد ${recoveredCards.length} بطاقة بشكل إجمالي`);
+        
+        // تحديث المتغير العالمي
+        window.investorCards = recoveredCards;
+        
+        // حفظ في التخزين المحلي
+        localStorage.setItem('investorCards', JSON.stringify(recoveredCards));
+        
+        // مزامنة مع Firebase إذا كان متاحًا
+        try {
+            if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+                recoveredCards.forEach(card => {
+                    firebase.database().ref(`investorCards/${card.id}`).set(card);
+                });
+                console.log("✅ تم مزامنة البطاقات المستردة مع Firebase");
+            }
+        } catch (error) {
+            console.error("❌ خطأ في مزامنة البطاقات مع Firebase:", error);
+        }
+        
+        // تحديث واجهة المستخدم
+        if (typeof updateCardsDisplay === 'function') {
+            updateCardsDisplay();
+        }
+        
+        if (typeof updateCardsBadges === 'function') {
+            updateCardsBadges();
+        }
+        
+        // عرض إشعار نجاح
+        showRecoveryNotification(recoveredCards.length);
+        
+        return recoveredCards;
+    } else {
+        console.warn("⚠️ لم يتم العثور على أي بطاقات لاستردادها");
+        return [];
+    }
+}
+
+// عرض إشعار استعادة البطاقات
+function showRecoveryNotification(count) {
+    // إنشاء عنصر الإشعار
+    const notification = document.createElement('div');
+    notification.className = 'recovery-notification';
+    notification.innerHTML = `
+        <div class="recovery-icon">
+            <i class="fas fa-undo"></i>
+        </div>
+        <div class="recovery-content">
+            <h3>تم استعادة البطاقات بنجاح</h3>
+            <p>تم استرداد ${count} بطاقة من مصادر التخزين المختلفة</p>
+        </div>
+        <button class="recovery-close">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // إضافة نمط CSS
+    const style = document.createElement('style');
+    style.textContent = `
+        .recovery-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #27ae60;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            z-index: 10000;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            min-width: 300px;
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        
+        .recovery-icon {
+            font-size: 24px;
+        }
+        
+        .recovery-content {
+            flex: 1;
+        }
+        
+        .recovery-content h3 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+        }
+        
+        .recovery-content p {
+            margin: 0;
+            font-size: 14px;
+        }
+        
+        .recovery-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0;
+        }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(notification);
+    
+    // إضافة معالج الحدث للزر الإغلاق
+    notification.querySelector('.recovery-close').addEventListener('click', () => {
+        notification.remove();
+    });
+    
+    // إزالة الإشعار تلقائيًا بعد 10 ثوانٍ
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.5s ease forwards';
+        
+        // إضافة تعريف الرسوم المتحركة للخروج
+        const exitAnimation = document.createElement('style');
+        exitAnimation.textContent = `
+            @keyframes slideOut {
+                from { transform: translateX(0); }
+                to { transform: translateX(100%); }
+            }
+        `;
+        document.head.appendChild(exitAnimation);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 500);
+    }, 10000);
+}
+
+// ============= القسم 2: إصلاح نظام إضافة البطاقات الجديدة =============
+
+// نظام إضافة البطاقات الجديد (مستقل تمامًا)
+function createNewCardSystem() {
+    console.log("🔄 إنشاء نظام جديد مستقل لإضافة البطاقات...");
+    
+    // 1. إنشاء زر إضافة بطاقة جديد
+    createNewAddCardButton();
+    
+    // 2. إنشاء نافذة إضافة بطاقة جديدة
+    createNewCardModal();
+    
+    // 3. تعريف وظائف معالجة البطاقات
+    defineCardProcessingFunctions();
+    
+    console.log("✅ تم إنشاء نظام إضافة البطاقات الجديد بنجاح");
+}
+
+// إنشاء زر إضافة بطاقة جديد
+function createNewAddCardButton() {
+    // إزالة الزر القديم إن وجد
+    const oldButton = document.querySelector('.add-card-button, .btn-add-card');
+    if (oldButton) {
+        oldButton.remove();
+    }
+    
+    // البحث عن حاوية مناسبة للزر
+    let buttonContainer = document.querySelector('.header-actions, .page-header, .card-header, header');
+    
+    if (!buttonContainer) {
+        // إنشاء حاوية إذا لم تكن موجودة
+        buttonContainer = document.createElement('div');
+        buttonContainer.className = 'header-actions';
+        buttonContainer.style.cssText = 'display: flex; justify-content: flex-end; padding: 10px; margin-bottom: 20px;';
+        
+        // إضافة الحاوية للصفحة
+        const mainContent = document.querySelector('.main-content, main, .container, body');
+        if (mainContent) {
+            mainContent.insertBefore(buttonContainer, mainContent.firstChild);
+        } else {
+            document.body.insertBefore(buttonContainer, document.body.firstChild);
+        }
+    }
+    
+    // إنشاء الزر الجديد
+    const newButton = document.createElement('button');
+    newButton.className = 'btn btn-primary new-add-card-button';
+    newButton.innerHTML = '<i class="fas fa-plus"></i> إضافة بطاقة جديدة';
+    newButton.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;';
+    
+    // إضافة الحدث
+    newButton.onclick = function() {
+        openNewCardModal();
+    };
+    
+    // إضافة الزر للحاوية
+    buttonContainer.appendChild(newButton);
+    console.log("✅ تم إنشاء زر إضافة بطاقة جديد");
+}
+
+// إنشاء نافذة إضافة بطاقة جديدة
+function createNewCardModal() {
+    // إزالة النافذة القديمة إن وجدت
+    const oldModal = document.getElementById('new-card-modal');
+    if (oldModal) {
+        oldModal.remove();
+    }
+    
+    // إنشاء النافذة الجديدة
+    const modal = document.createElement('div');
+    modal.id = 'new-card-modal';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s, visibility 0.3s;
+    `;
+    
+    // محتوى النافذة
+    modal.innerHTML = `
+        <div class="modal-content" style="
+            background-color: white;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: transform 0.3s, opacity 0.3s;
+        ">
+            <div class="modal-header" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 20px;
+                border-bottom: 1px solid #eee;
+            ">
+                <h2 style="margin: 0; font-size: 20px; color: #333;">إضافة بطاقة جديدة</h2>
+                <button class="modal-close-btn" style="
+                    background: none;
+                    border: none;
+                    font-size: 20px;
+                    cursor: pointer;
+                    color: #777;
+                ">×</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 20px;">
+                <form id="new-card-form">
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="new-card-investor" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">المستثمر</label>
+                        <select id="new-card-investor" style="
+                            width: 100%;
+                            padding: 12px;
+                            border: 1px solid #ddd;
+                            border-radius: 5px;
+                            font-size: 16px;
+                            background-color: #f8f9fa;
+                        " required>
+                            <option value="">اختر المستثمر</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="new-card-expiry" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">تاريخ الانتهاء</label>
+                        <input type="month" id="new-card-expiry" style="
+                            width: 100%;
+                            padding: 12px;
+                            border: 1px solid #ddd;
+                            border-radius: 5px;
+                            font-size: 16px;
+                            background-color: #f8f9fa;
+                        " required>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">نوع البطاقة</label>
+                        <div class="card-types" style="
+                            display: flex;
+                            gap: 10px;
+                        ">
+                            <div class="card-type-option premium" style="
+                                flex: 1;
+                                border: 2px solid #e9ecef;
+                                border-radius: 10px;
+                                padding: 15px 10px;
+                                text-align: center;
+                                cursor: pointer;
+                                transition: all 0.3s;
+                                background-color: rgba(52, 73, 94, 0.1);
+                            " data-type="premium">
+                                <input type="radio" name="new-card-type" value="premium" style="display: none;" checked>
+                                <div style="font-size: 24px; margin-bottom: 10px; color: #34495e;">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <div style="font-weight: 600; color: #333;">بريميوم</div>
+                            </div>
+                            
+                            <div class="card-type-option gold" style="
+                                flex: 1;
+                                border: 2px solid #e9ecef;
+                                border-radius: 10px;
+                                padding: 15px 10px;
+                                text-align: center;
+                                cursor: pointer;
+                                transition: all 0.3s;
+                                background-color: rgba(241, 196, 15, 0.1);
+                            " data-type="gold">
+                                <input type="radio" name="new-card-type" value="gold" style="display: none;">
+                                <div style="font-size: 24px; margin-bottom: 10px; color: #f39c12;">
+                                    <i class="fas fa-crown"></i>
+                                </div>
+                                <div style="font-weight: 600; color: #333;">ذهبية</div>
+                            </div>
+                            
+                            <div class="card-type-option platinum" style="
+                                flex: 1;
+                                border: 2px solid #e9ecef;
+                                border-radius: 10px;
+                                padding: 15px 10px;
+                                text-align: center;
+                                cursor: pointer;
+                                transition: all 0.3s;
+                                background-color: rgba(149, 165, 166, 0.1);
+                            " data-type="platinum">
+                                <input type="radio" name="new-card-type" value="platinum" style="display: none;">
+                                <div style="font-size: 24px; margin-bottom: 10px; color: #7f8c8d;">
+                                    <i class="fas fa-gem"></i>
+                                </div>
+                                <div style="font-weight: 600; color: #333;">بلاتينية</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">معاينة البطاقة</label>
+                        <div id="new-card-preview" style="
+                            display: flex;
+                            justify-content: center;
+                            margin-top: 10px;
+                            padding: 20px;
+                            background-color: #f8f9fa;
+                            border-radius: 10px;
+                            min-height: 200px;
+                        "></div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer" style="
+                padding: 15px 20px;
+                border-top: 1px solid #eee;
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+            ">
+                <button class="btn-cancel" style="
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 5px;
+                    background-color: #f8f9fa;
+                    color: #333;
+                    cursor: pointer;
+                    font-size: 16px;
+                ">إلغاء</button>
+                
+                <button class="btn-create" style="
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 5px;
+                    background-color: #3498db;
+                    color: white;
+                    cursor: pointer;
+                    font-size: 16px;
+                ">إنشاء البطاقة</button>
+            </div>
+        </div>
+    `;
+    
+    // إضافة النافذة إلى DOM
+    document.body.appendChild(modal);
+    
+    // إضافة معالجي الأحداث
+    const closeBtn = modal.querySelector('.modal-close-btn');
+    const cancelBtn = modal.querySelector('.btn-cancel');
+    const createBtn = modal.querySelector('.btn-create');
+    const cardTypeOptions = modal.querySelectorAll('.card-type-option');
+    
+    // زر الإغلاق
+    closeBtn.addEventListener('click', closeNewCardModal);
+    cancelBtn.addEventListener('click', closeNewCardModal);
+    
+    // زر الإنشاء
+    createBtn.addEventListener('click', createNewCard);
+    
+    // خيارات نوع البطاقة
+    cardTypeOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            // إزالة الفئة من جميع الخيارات
+            cardTypeOptions.forEach(opt => {
+                opt.style.borderColor = '#e9ecef';
+                opt.style.boxShadow = 'none';
+            });
+            
+            // إضافة الفئة للخيار المحدد
+            this.style.borderColor = '#3498db';
+            this.style.boxShadow = '0 0 10px rgba(52, 152, 219, 0.3)';
+            
+            // تحديد زر الراديو
+            this.querySelector('input[type="radio"]').checked = true;
+            
+            // تحديث المعاينة
+            updateNewCardPreview();
+        });
+    });
+    
+    // تحديد الخيار الافتراضي
+    cardTypeOptions[0].style.borderColor = '#3498db';
+    cardTypeOptions[0].style.boxShadow = '0 0 10px rgba(52, 152, 219, 0.3)';
+    
+    // تحميل المستثمرين
+    loadInvestorsForNewCard();
+    
+    // تعيين تاريخ انتهاء افتراضي
+    const expiryInput = document.getElementById('new-card-expiry');
+    if (expiryInput) {
+        const now = new Date();
+        const futureDate = new Date(now.getFullYear() + 3, now.getMonth());
+        expiryInput.value = futureDate.toISOString().slice(0, 7);
+    }
+    
+    // تحديث المعاينة
+    updateNewCardPreview();
+    
+    console.log("✅ تم إنشاء نافذة إضافة البطاقة الجديدة");
+}
+
+// فتح نافذة إضافة البطاقة الجديدة
+function openNewCardModal() {
+    const modal = document.getElementById('new-card-modal');
+    if (!modal) {
+        createNewCardModal();
+        setTimeout(openNewCardModal, 100);
+        return;
+    }
+    
+    // عرض النافذة
+    modal.style.visibility = 'visible';
+    modal.style.opacity = '1';
+    
+    // تحريك المحتوى
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) {
+        modalContent.style.transform = 'translateY(0)';
+        modalContent.style.opacity = '1';
+    }
+    
+    // تحديث قائمة المستثمرين
+    loadInvestorsForNewCard();
+    
+    // تحديث المعاينة
+    updateNewCardPreview();
+    
+    console.log("✅ تم فتح نافذة إضافة البطاقة");
+}
+
+// إغلاق نافذة إضافة البطاقة الجديدة
+function closeNewCardModal() {
+    const modal = document.getElementById('new-card-modal');
+    if (!modal) return;
+    
+    // إخفاء المحتوى
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) {
+        modalContent.style.transform = 'translateY(-20px)';
+        modalContent.style.opacity = '0';
+    }
+    
+    // إخفاء النافذة
+    setTimeout(() => {
+        modal.style.opacity = '0';
+        modal.style.visibility = 'hidden';
+    }, 300);
+    
+    console.log("✅ تم إغلاق نافذة إضافة البطاقة");
+}
+
+// تحميل المستثمرين لنافذة البطاقة الجديدة
+function loadInvestorsForNewCard() {
+    const investorSelect = document.getElementById('new-card-investor');
+    if (!investorSelect) return;
+    
+    // مسح القائمة
+    investorSelect.innerHTML = '<option value="">اختر المستثمر</option>';
+    
+    // التحقق من وجود مصفوفة المستثمرين
+    if (!Array.isArray(window.investors) || window.investors.length === 0) {
+        // محاولة تحميل المستثمرين من مصادر مختلفة
+        const storedInvestors = localStorage.getItem('investors');
+        if (storedInvestors) {
+            window.investors = JSON.parse(storedInvestors);
+        } else if (typeof loadInvestors === 'function') {
+            loadInvestors();
+        } else if (typeof fetchInvestors === 'function') {
+            fetchInvestors();
+        }
+        
+        // إذا ما زالت المصفوفة فارغة، إضافة بعض البيانات الافتراضية للتجربة
+        if (!Array.isArray(window.investors) || window.investors.length === 0) {
+            window.investors = [
+                { id: 'inv1', name: 'أحمد محمود', phone: '07700000001' },
+                { id: 'inv2', name: 'سارة عبدالله', phone: '07700000002' },
+                { id: 'inv3', name: 'محمد علي', phone: '07700000003' }
+            ];
+        }
+    }
+    
+    // إضافة المستثمرين للقائمة
+    window.investors.forEach(investor => {
+        const option = document.createElement('option');
+        option.value = investor.id;
+        option.textContent = investor.name;
+        option.dataset.phone = investor.phone || '';
+        investorSelect.appendChild(option);
+    });
+    
+    console.log(`✅ تم تحميل ${window.investors.length} مستثمر في القائمة`);
+}
+
+// تحديث معاينة البطاقة الجديدة
+function updateNewCardPreview() {
+    const previewContainer = document.getElementById('new-card-preview');
+    if (!previewContainer) return;
+    
+    // الحصول على البيانات
+    const investorSelect = document.getElementById('new-card-investor');
+    const expiryInput = document.getElementById('new-card-expiry');
+    const cardTypeRadios = document.querySelectorAll('input[name="new-card-type"]');
+    
+    // اختيار المستثمر
+    let investor;
+    if (investorSelect && investorSelect.value) {
+        const selectedInvestor = window.investors.find(inv => inv.id === investorSelect.value);
+        investor = selectedInvestor || { id: 'temp', name: investorSelect.options[investorSelect.selectedIndex].text };
+    } else {
+        investor = { id: 'temp', name: 'حامل البطاقة' };
+    }
+    
+    // تاريخ الانتهاء
+    const expiry = expiryInput ? expiryInput.value : new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
+    
+    // نوع البطاقة
+    let cardType = 'premium';
+    cardTypeRadios.forEach(radio => {
+        if (radio.checked) {
+            cardType = radio.value;
+        }
+    });
+    
+    // إنشاء رقم بطاقة مؤقت
+    const tempNumber = generateTempCardNumber(cardType);
+    
+    // إنشاء بطاقة مؤقتة
+    const tempCard = {
+        id: 'preview',
+        number: tempNumber,
+        type: cardType,
+        expiry: expiry,
+        status: 'active',
+        investorId: investor.id
+    };
+    
+    // إنشاء HTML للمعاينة
+    previewContainer.innerHTML = createCardPreviewHTML(tempCard, investor);
+}
+
+// إنشاء HTML لمعاينة البطاقة
+function createCardPreviewHTML(card, investor) {
+    return `
+        <div class="preview-card ${card.type}" style="
+            width: 350px;
+            height: 220px;
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            background: ${getCardGradient(card.type)};
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        ">
+            <div class="card-shimmer" style="
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                animation: shimmer 3s infinite;
+            "></div>
+            
+            <style>
+                @keyframes shimmer {
+                    0% { left: -100%; }
+                    50% { left: 100%; }
+                    100% { left: 100%; }
+                }
+            </style>
+            
+            <div class="card-content" style="
+                position: relative;
+                height: 100%;
+                padding: 20px;
+                color: white;
+                z-index: 1;
+            ">
+                <div class="card-header" style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 15px;
+                ">
+                    <div class="card-logo" style="
+                        width: 60px;
+                        height: 35px;
+                        background: white;
+                        border-radius: 5px;
+                        padding: 5px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    ">
+                        <div style="font-size: 12px; font-weight: bold; color: #333;">IIB</div>
+                    </div>
+                    
+                    <div class="card-chip-container" style="
+                        position: absolute;
+                        top: 60px;
+                        left: 30px;
+                    ">
+                        <div class="card-chip" style="
+                            width: 50px;
+                            height: 40px;
+                            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+                            border-radius: 8px;
+                            position: relative;
+                            overflow: hidden;
+                        ">
+                            <div class="chip-lines" style="
+                                position: absolute;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                                width: 35px;
+                                height: 25px;
+                                border: 2px solid rgba(0,0,0,0.2);
+                                border-radius: 4px;
+                            "></div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-type-icon" style="
+                        font-size: 24px;
+                        color: rgba(255,255,255,0.8);
+                    ">
+                        <i class="fas fa-${card.type === 'platinum' ? 'gem' : card.type === 'gold' ? 'crown' : 'star'}"></i>
+                    </div>
+                </div>
+                
+                <div class="card-qr-container" style="
+                    position: absolute;
+                    top: 20px;
+                    right: 20px;
+                    background: white;
+                    padding: 5px;
+                    border-radius: 8px;
+                    width: 80px;
+                    height: 80px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">
+                    <div style="font-size: 50px; color: #333;">
+                        <i class="fas fa-qrcode"></i>
+                    </div>
+                </div>
+                
+                <div class="card-number" style="
+                    font-size: 20px;
+                    letter-spacing: 3px;
+                    margin-top: 20px;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                    font-family: 'Courier New', monospace;
+                ">
+                    ${formatCardNumberForDisplay(card.number)}
+                </div>
+                
+                <div class="card-details" style="
+                    position: absolute;
+                    bottom: 20px;
+                    left: 20px;
+                    right: 20px;
+                    display: flex;
+                    justify-content: space-between;
+                ">
+                    <div class="card-holder">
+                        <div class="card-label" style="
+                            font-size: 9px;
+                            text-transform: uppercase;
+                            letter-spacing: 1px;
+                            opacity: 0.7;
+                            margin-bottom: 5px;
+                        ">CARD HOLDER</div>
+                        <div class="card-value" style="
+                            font-size: 14px;
+                            font-weight: 600;
+                            letter-spacing: 1px;
+                        ">${investor.name.toUpperCase()}</div>
+                    </div>
+                    
+                    <div class="card-expiry">
+                        <div class="card-label" style="
+                            font-size: 9px;
+                            text-transform: uppercase;
+                            letter-spacing: 1px;
+                            opacity: 0.7;
+                            margin-bottom: 5px;
+                        ">VALID THRU</div>
+                        <div class="card-value" style="
+                            font-size: 14px;
+                            font-weight: 600;
+                            letter-spacing: 1px;
+                        ">${formatExpiryForDisplay(card.expiry)}</div>
+                    </div>
+                </div>
+                
+                <div class="card-footer" style="
+                    position: absolute;
+                    bottom: 10px;
+                    right: 20px;
+                    text-align: right;
+                ">
+                    <div class="card-bank-name" style="
+                        font-size: 10px;
+                        opacity: 0.6;
+                    ">بنك الاستثمار العراقي</div>
+                    <div class="card-type-name" style="
+                        font-size: 12px;
+                        font-weight: 600;
+                        margin-top: 3px;
+                    ">${getCardTypeNameForDisplay(card.type).toUpperCase()}</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// الحصول على تدرج لون البطاقة
+function getCardGradient(cardType) {
+    switch (cardType) {
+        case 'platinum':
+            return 'linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)';
+        case 'gold':
+            return 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)';
+        case 'premium':
+        default:
+            return 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)';
+    }
+}
+
+// توليد رقم بطاقة مؤقت
+function generateTempCardNumber(cardType) {
+    const prefixes = {
+        'platinum': '5555',
+        'gold': '4444',
+        'premium': '3333'
+    };
+    
+    const prefix = prefixes[cardType] || '3333';
+    
+    let number = prefix;
+    for (let i = 0; i < 12; i++) {
+        number += Math.floor(Math.random() * 10);
+    }
+    
+    return number;
+}
+
+// تنسيق رقم البطاقة للعرض
+function formatCardNumberForDisplay(number) {
+    return number.replace(/(\d{4})/g, '$1 ').trim();
+}
+
+// تنسيق تاريخ الانتهاء للعرض
+function formatExpiryForDisplay(date) {
+    if (!date) return '';
+    const parts = date.split('-');
+    return `${parts[1]}/${parts[0].substring(2)}`;
+}
+
+// الحصول على اسم نوع البطاقة للعرض
+function getCardTypeNameForDisplay(type) {
+    switch (type) {
+        case 'platinum': return 'بلاتينية';
+        case 'gold': return 'ذهبية';
+        case 'premium': return 'بريميوم';
+        default: return type;
+    }
+}
+
+// إنشاء بطاقة جديدة
+function createNewCard() {
+    try {
+        console.log("🔄 جاري إنشاء بطاقة جديدة...");
+        
+        // الحصول على البيانات
+        const investorSelect = document.getElementById('new-card-investor');
+        const expiryInput = document.getElementById('new-card-expiry');
+        const cardTypeRadios = document.querySelectorAll('input[name="new-card-type"]');
+        
+        if (!investorSelect) {
+            throw new Error("لم يتم العثور على حقل اختيار المستثمر");
+        }
+        
+        // معرف المستثمر
+        const investorId = investorSelect.value;
+        if (!investorId) {
+            showValidationError("يرجى اختيار المستثمر");
+            return;
+        }
+        
+        // تاريخ الانتهاء
+        const expiry = expiryInput ? expiryInput.value : new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
+        if (!expiry) {
+            showValidationError("يرجى إدخال تاريخ الانتهاء");
+            return;
+        }
+        
+        // نوع البطاقة
+        let cardType = 'premium';
+        cardTypeRadios.forEach(radio => {
+            if (radio.checked) {
+                cardType = radio.value;
+            }
+        });
+        
+        // التأكد من وجود مصفوفة البطاقات
+        if (!Array.isArray(window.investorCards)) {
+            window.investorCards = [];
+        }
+        
+        // توليد معرف جديد
+        const newId = generateUniqueId();
+        
+        // توليد رقم بطاقة
+        const newNumber = generateCardNumber(cardType);
+        
+        // إنشاء كائن البطاقة الجديدة
+        const newCard = {
+            id: newId,
+            investorId: investorId,
+            number: newNumber,
+            type: cardType,
+            expiry: expiry,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            transactions: [],
+            limits: {
+                dailyLimit: cardType === 'platinum' ? 10000000 : cardType === 'gold' ? 5000000 : 2000000,
+                monthlyLimit: cardType === 'platinum' ? 100000000 : cardType === 'gold' ? 50000000 : 20000000,
+                withdrawalLimit: cardType === 'platinum' ? 5000000 : cardType === 'gold' ? 2500000 : 1000000
+            },
+            features: getCardFeaturesForType(cardType)
+        };
+        
+        // إضافة البطاقة للمصفوفة
+        window.investorCards.push(newCard);
+        
+        // حفظ البطاقات
+        saveCards(newCard);
+        
+        // إغلاق النافذة
+        closeNewCardModal();
+        
+        // تحديث واجهة المستخدم
+        updateUI();
+        
+        // عرض إشعار نجاح
+        showSuccessNotification('تم إنشاء البطاقة بنجاح');
+        
+        console.log("✅ تم إنشاء البطاقة بنجاح:", newCard);
+        return true;
+        
+    } catch (error) {
+        console.error("❌ حدث خطأ أثناء إنشاء البطاقة:", error);
+        showErrorNotification(`حدث خطأ: ${error.message}`);
+        return false;
+    }
+}
+
+// عرض خطأ التحقق
+function showValidationError(message) {
+    // إنشاء عنصر الخطأ
+    const errorElement = document.createElement('div');
+    errorElement.className = 'validation-error';
+    errorElement.style.cssText = `
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+        text-align: center;
+        animation: shake 0.5s ease;
+    `;
+    
+    // إضافة تعريف الرسوم المتحركة للاهتزاز
+    const shakeAnimation = document.createElement('style');
+    shakeAnimation.textContent = `
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+    `;
+    document.head.appendChild(shakeAnimation);
+    
+    // إضافة النص
+    errorElement.textContent = message;
+    
+    // حذف أي رسائل خطأ سابقة
+    document.querySelectorAll('.validation-error').forEach(el => el.remove());
+    
+    // إضافة العنصر للنافذة
+    const modalBody = document.querySelector('#new-card-modal .modal-body');
+    if (modalBody) {
+        modalBody.insertBefore(errorElement, modalBody.firstChild);
+    }
+    
+    // إزالة الرسالة بعد 3 ثوانٍ
+    setTimeout(() => {
+        errorElement.style.opacity = '0';
+        errorElement.style.transition = 'opacity 0.5s';
+        setTimeout(() => {
+            errorElement.remove();
+        }, 500);
+    }, 3000);
+}
+
+// عرض إشعار نجاح
+function showSuccessNotification(message) {
+    showNotification(message, 'success');
+}
+
+// عرض إشعار خطأ
+function showErrorNotification(message) {
+    showNotification(message, 'error');
+}
+
+// عرض إشعار
+function showNotification(message, type = 'info') {
+    // الألوان حسب النوع
+    const colors = {
+        success: '#27ae60',
+        error: '#e74c3c',
+        info: '#3498db',
+        warning: '#f39c12'
+    };
+    const color = colors[type] || colors.info;
+    
+    // الأيقونة حسب النوع
+    const icons = {
+        success: 'check-circle',
+        error: 'exclamation-circle',
+        info: 'info-circle',
+        warning: 'exclamation-triangle'
+    };
+    const icon = icons[type] || icons.info;
+    
+    // إنشاء عنصر الإشعار
+    const notification = document.createElement('div');
+    notification.className = 'system-notification';
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: ${color};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        z-index: 10000;
+        min-width: 300px;
+        transform: translateX(100%);
+        animation: slide-in 0.5s forwards;
+    `;
+    
+    // إضافة تعريف الرسوم المتحركة للدخول
+    const slideAnimation = document.createElement('style');
+    slideAnimation.textContent = `
+        @keyframes slide-in {
+            to { transform: translateX(0); }
+        }
+        @keyframes slide-out {
+            to { transform: translateX(100%); }
+        }
+    `;
+    document.head.appendChild(slideAnimation);
+    
+    // إضافة المحتوى
+    notification.innerHTML = `
+        <div style="font-size: 24px;">
+            <i class="fas fa-${icon}"></i>
+        </div>
+        <div style="flex: 1;">
+            ${message}
+        </div>
+        <button style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // إضافة الإشعار للصفحة
+    document.body.appendChild(notification);
+    
+    // إضافة حدث إغلاق
+    notification.querySelector('button').addEventListener('click', () => {
+        notification.style.animation = 'slide-out 0.5s forwards';
+        setTimeout(() => {
+            notification.remove();
+        }, 500);
+    });
+    
+    // إغلاق تلقائي بعد 5 ثوانٍ
+    setTimeout(() => {
+        if (document.body.contains(notification)) {
+            notification.style.animation = 'slide-out 0.5s forwards';
+            setTimeout(() => {
+                notification.remove();
+            }, 500);
+        }
+    }, 5000);
+}
+
+// تعريف وظائف معالجة البطاقات
+function defineCardProcessingFunctions() {
+    // توليد معرف فريد
+    window.generateUniqueId = function() {
+        const timestamp = Date.now().toString(36);
+        const randomStr = Math.random().toString(36).substring(2, 10);
+        return `${timestamp}-${randomStr}`;
+    };
+    
+    // توليد رقم بطاقة
+    window.generateCardNumber = function(cardType) {
+        const prefixes = {
+            'platinum': '5555',
+            'gold': '4444',
+            'premium': '3333'
+        };
+        
+        const prefix = prefixes[cardType] || '3333';
+        
+        let number = prefix;
+        for (let i = 0; i < 12; i++) {
+            number += Math.floor(Math.random() * 10);
+        }
+        
+        // إضافة رقم تحقق (Luhn algorithm)
+        let sum = 0;
+        let isEven = false;
+        
+        for (let i = number.length - 1; i >= 0; i--) {
+            let digit = parseInt(number.charAt(i));
+            
+            if (isEven) {
+                digit *= 2;
+                if (digit > 9) {
+                    digit = digit - 9;
+                }
+            }
+            
+            sum += digit;
+            isEven = !isEven;
+        }
+        
+        const checkDigit = (10 - (sum % 10)) % 10;
+        return number + checkDigit;
+    };
+    
+    // الحصول على مزايا البطاقة
+    window.getCardFeaturesForType = function(cardType) {
+        switch (cardType) {
+            case 'platinum':
+                return {
+                    profitBonus: 0.25, // مكافأة أرباح إضافية 0.25%
+                    freeTransactions: -1, // معاملات مجانية غير محدودة
+                    prioritySupport: true,
+                    vipAccess: true,
+                    insurance: true
+                };
+            case 'gold':
+                return {
+                    profitBonus: 0.15, // مكافأة أرباح إضافية 0.15%
+                    freeTransactions: 50, // 50 معاملة مجانية شهرياً
+                    prioritySupport: true,
+                    vipAccess: false,
+                    insurance: true
+                };
+            case 'premium':
+            default:
+                return {
+                    profitBonus: 0, // بدون مكافأة إضافية
+                    freeTransactions: 20, // 20 معاملة مجانية شهرياً
+                    prioritySupport: false,
+                    vipAccess: false,
+                    insurance: false
+                };
+        }
+    };
+    
+    // حفظ البطاقات
+    window.saveCards = function(newCard) {
+        // حفظ في التخزين المحلي
+        localStorage.setItem('investorCards', JSON.stringify(window.investorCards));
+        
+        // محاولة الحفظ في Firebase
+        try {
+            if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+                // حفظ البطاقة الجديدة
+                firebase.database().ref(`investorCards/${newCard.id}`).set(newCard);
+                console.log("✅ تم حفظ البطاقة في Firebase");
+            }
+        } catch (error) {
+            console.error("❌ خطأ في حفظ البطاقة في Firebase:", error);
+        }
+        
+        // محاولة استخدام وظائف النظام القديم
+        if (typeof saveInvestorCards === 'function') {
+            try {
+                saveInvestorCards();
+            } catch (error) {
+                console.warn("⚠️ خطأ في استخدام وظيفة حفظ البطاقات القديمة:", error);
+            }
+        }
+        
+        // محاولة استخدام المزامنة مع Firebase القديمة
+        if (typeof syncCardToFirebase === 'function') {
+            try {
+                syncCardToFirebase(newCard);
+            } catch (error) {
+                console.warn("⚠️ خطأ في استخدام وظيفة مزامنة Firebase القديمة:", error);
+            }
+        }
+        
+        console.log("✅ تم حفظ البطاقات بنجاح");
+    };
+    
+    // تحديث واجهة المستخدم
+    window.updateUI = function() {
+        // محاولة استخدام وظائف النظام القديم
+        if (typeof updateCardsDisplay === 'function') {
+            try {
+                updateCardsDisplay();
+            } catch (error) {
+                console.warn("⚠️ خطأ في استخدام وظيفة تحديث العرض القديمة:", error);
+                // تطبيق تحديث بديل
+                applyAlternativeUIUpdate();
+            }
+        } else {
+            // تطبيق تحديث بديل
+            applyAlternativeUIUpdate();
+        }
+        
+        // تحديث الشارات
+        if (typeof updateCardsBadges === 'function') {
+            try {
+                updateCardsBadges();
+            } catch (error) {
+                console.warn("⚠️ خطأ في استخدام وظيفة تحديث الشارات القديمة:", error);
+            }
+        }
+        
+        console.log("✅ تم تحديث واجهة المستخدم");
+    };
+    
+    // تطبيق تحديث بديل لواجهة المستخدم
+    window.applyAlternativeUIUpdate = function() {
+        // البحث عن عنصر لعرض البطاقات
+        const cardsContainer = document.querySelector('#cardsGrid, .cards-container, .investor-cards');
+        
+        if (cardsContainer) {
+            // مسح المحتوى
+            cardsContainer.innerHTML = '';
+            
+            // عرض البطاقات
+            if (Array.isArray(window.investorCards) && window.investorCards.length > 0) {
+                window.investorCards.forEach(card => {
+                    // البحث عن المستثمر
+                    const investor = window.investors.find(inv => inv.id === card.investorId);
+                    if (!investor) return;
+                    
+                    // إنشاء عنصر البطاقة
+                    const cardElement = document.createElement('div');
+                    cardElement.className = `investor-card ${card.type} ${card.status === 'suspended' ? 'suspended' : ''}`;
+                    cardElement.style.cssText = `
+                        width: 350px;
+                        height: 220px;
+                        border-radius: 15px;
+                        position: relative;
+                        overflow: hidden;
+                        cursor: pointer;
+                        margin: 15px;
+                        background: ${getCardGradient(card.type)};
+                        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+                    `;
+                    
+                    // إضافة محتوى البطاقة
+                    cardElement.innerHTML = `
+                        <div class="card-content" style="position: relative; height: 100%; padding: 20px; color: white; z-index: 1;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                                <div class="card-logo" style="width: 60px; height: 35px; background: white; border-radius: 5px; padding: 5px; display: flex; align-items: center; justify-content: center;">
+                                    <div style="font-size: 12px; font-weight: bold; color: #333;">IIB</div>
+                                </div>
+                                
+                                <div class="card-type-icon" style="font-size: 24px; color: rgba(255,255,255,0.8);">
+                                    <i class="fas fa-${card.type === 'platinum' ? 'gem' : card.type === 'gold' ? 'crown' : 'star'}"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="card-number" style="font-size: 20px; letter-spacing: 3px; margin-top: 60px; text-shadow: 0 1px 2px rgba(0,0,0,0.3); font-family: 'Courier New', monospace;">
+                                ${formatCardNumberForDisplay(card.number)}
+                            </div>
+                            
+                            <div class="card-details" style="position: absolute; bottom: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between;">
+                                <div class="card-holder">
+                                    <div class="card-label" style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-bottom: 5px;">CARD HOLDER</div>
+                                    <div class="card-value" style="font-size: 14px; font-weight: 600; letter-spacing: 1px;">${investor.name.toUpperCase()}</div>
+                                </div>
+                                
+                                <div class="card-expiry">
+                                    <div class="card-label" style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-bottom: 5px;">VALID THRU</div>
+                                    <div class="card-value" style="font-size: 14px; font-weight: 600; letter-spacing: 1px;">${formatExpiryForDisplay(card.expiry)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // إضافة حدث النقر
+                    cardElement.onclick = function() {
+                        if (typeof viewCardDetails === 'function') {
+                            viewCardDetails(card.id);
+                        } else {
+                            alert(`بطاقة ${investor.name}: ${formatCardNumberForDisplay(card.number)}`);
+                        }
+                    };
+                    
+                    // إضافة البطاقة للحاوية
+                    cardsContainer.appendChild(cardElement);
+                });
+            } else {
+                // عرض رسالة "لا توجد بطاقات"
+                cardsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 50px; width: 100%;">
+                        <i class="fas fa-credit-card fa-3x" style="color: #ccc; margin-bottom: 15px;"></i>
+                        <p style="color: #666;">لا توجد بطاقات</p>
+                        <button class="btn-primary new-add-card-button" style="margin-top: 15px; background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;">
+                            <i class="fas fa-plus"></i> إضافة بطاقة جديدة
+                        </button>
+                    </div>
+                `;
+                
+                // إضافة حدث النقر لزر الإضافة
+                cardsContainer.querySelector('.new-add-card-button').onclick = function() {
+                    openNewCardModal();
+                };
+            }
+        }
+    };
+    
+    console.log("✅ تم تعريف وظائف معالجة البطاقات");
+}
+
+// ============= القسم 3: دالة التنفيذ الرئيسية =============
+
+// دالة تنفيذ نظام الإصلاح الشامل
+function executeCardSystemRecovery() {
+    console.log("🔄 بدء تنفيذ نظام استعادة وإصلاح البطاقات الشامل...");
+    
+    // 1. استعادة البطاقات من جميع مصادر التخزين
+    recoverAllCards().then(recoveredCards => {
+        console.log(`✅ تم استرداد ${recoveredCards.length} بطاقة بنجاح`);
+        
+        // 2. إنشاء نظام إضافة البطاقات الجديد
+        createNewCardSystem();
+        
+        // 3. إضافة زر للتشخيص وإعادة الاسترداد
+        addDiagnosticButton();
+    }).catch(error => {
+        console.error("❌ حدث خطأ أثناء استعادة البطاقات:", error);
+        // إنشاء نظام إضافة البطاقات الجديد على أي حال
+        createNewCardSystem();
+    });
+}
+
+// إضافة زر للتشخيص وإعادة الاسترداد
+function addDiagnosticButton() {
+    // إنشاء الزر
+    const diagnosticBtn = document.createElement('button');
+    diagnosticBtn.className = 'diagnostic-btn';
+    diagnosticBtn.innerHTML = '<i class="fas fa-tools"></i>';
+    diagnosticBtn.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+        z-index: 9999;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+    `;
+    
+    // إضافة حدث النقر
+    diagnosticBtn.onclick = function() {
+        // إنشاء قائمة الخيارات
+        const menu = document.createElement('div');
+        menu.className = 'diagnostic-menu';
+        menu.style.cssText = `
+            position: fixed;
+            bottom: 80px;
+            left: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 9998;
+            overflow: hidden;
+        `;
+        
+        // إضافة خيارات القائمة
+        menu.innerHTML = `
+            <div class="menu-item" style="padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;">
+                <i class="fas fa-undo"></i> استعادة البطاقات
+            </div>
+            <div class="menu-item" style="padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;">
+                <i class="fas fa-sync"></i> تحديث العرض
+            </div>
+            <div class="menu-item" style="padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;">
+                <i class="fas fa-plus"></i> إضافة بطاقة
+            </div>
+            <div class="menu-item" style="padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;">
+                <i class="fas fa-bug"></i> عرض المشاكل
+            </div>
+        `;
+        
+        // إضافة أحداث النقر للخيارات
+        menu.querySelectorAll('.menu-item').forEach((item, index) => {
+            // إضافة تأثير التحويم
+            item.addEventListener('mouseover', function() {
+                this.style.backgroundColor = '#f0f0f0';
+            });
+            
+            item.addEventListener('mouseout', function() {
+                this.style.backgroundColor = 'white';
+            });
+            
+            // إضافة حدث النقر
+            item.addEventListener('click', function() {
+                switch (index) {
+                    case 0: // استعادة البطاقات
+                        recoverAllCards();
+                        break;
+                    case 1: // تحديث العرض
+                        if (typeof updateUI === 'function') {
+                            updateUI();
+                        } else {
+                            applyAlternativeUIUpdate();
+                        }
+                        break;
+                    case 2: // إضافة بطاقة
+                        openNewCardModal();
+                        break;
+                    case 3: // عرض المشاكل
+                        showDiagnosticInfo();
+                        break;
+                }
+                
+                // إغلاق القائمة
+                menu.remove();
+            });
+        });
+        
+        // إضافة القائمة للصفحة
+        document.body.appendChild(menu);
+        
+        // إغلاق القائمة عند النقر خارجها
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target) && e.target !== diagnosticBtn) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        });
+    };
+    
+    // إضافة الزر للصفحة
+    document.body.appendChild(diagnosticBtn);
+}
+
+// عرض معلومات التشخيص
+function showDiagnosticInfo() {
+    console.group("📊 معلومات تشخيص نظام البطاقات");
+    
+    // عرض حالة المصفوفات
+    console.log("مصفوفة البطاقات:", Array.isArray(window.investorCards) ? window.investorCards : "غير موجودة");
+    console.log("مصفوفة المستثمرين:", Array.isArray(window.investors) ? window.investors : "غير موجودة");
+    
+    // عرض حالة الوظائف الهامة
+    console.log("وظيفة updateCardsDisplay:", typeof updateCardsDisplay === 'function' ? "موجودة" : "غير موجودة");
+    console.log("وظيفة saveInvestorCards:", typeof saveInvestorCards === 'function' ? "موجودة" : "غير موجودة");
+    console.log("وظيفة syncCardToFirebase:", typeof syncCardToFirebase === 'function' ? "موجودة" : "غير موجودة");
+    
+    // عرض حالة Firebase
+    console.log("Firebase:", typeof firebase !== 'undefined' ? "موجود" : "غير موجود");
+    console.log("Firebase مهيأ:", typeof firebase !== 'undefined' && firebase.apps.length > 0 ? "نعم" : "لا");
+    
+    // عرض حالة عناصر DOM
+    console.log("حاوية البطاقات:", document.querySelector('#cardsGrid, .cards-container, .investor-cards') ? "موجودة" : "غير موجودة");
+    console.log("نافذة إنشاء البطاقة القديمة:", document.getElementById('createCardModal') ? "موجودة" : "غير موجودة");
+    console.log("نافذة إنشاء البطاقة الجديدة:", document.getElementById('new-card-modal') ? "موجودة" : "غير موجودة");
+    
+    console.groupEnd();
+    
+    // عرض إشعار للمستخدم
+    showNotification("تم عرض معلومات التشخيص في وحدة التحكم (F12)", 'info');
+}
+
+// تنفيذ نظام الاستعادة عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', executeCardSystemRecovery);
