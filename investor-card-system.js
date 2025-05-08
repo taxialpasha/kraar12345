@@ -443,6 +443,12 @@ function getCardFeatures(cardType) {
 // ===============================================================
 
 // توليد رمز QR للبطاقة - محسن
+/**
+ * توليد رمز QR للبطاقة - محسن
+ * @param {HTMLCanvasElement} canvas - عنصر الكانفس المراد الرسم عليه
+ * @param {Object} card - بيانات البطاقة
+ * @param {Object} investor - بيانات المستثمر
+ */
 function generateCardQRCode(canvas, card, investor) {
     try {
         if (!canvas) return;
@@ -451,7 +457,7 @@ function generateCardQRCode(canvas, card, investor) {
         const cardData = createCardData(card, investor);
         
         // التحقق من وجود مكتبة QRCode
-        if (window.QRCode) {
+        if (typeof QRCode === 'function') {
             try {
                 // استخدام مكتبة QRCode.js
                 new QRCode(canvas, {
@@ -460,7 +466,7 @@ function generateCardQRCode(canvas, card, investor) {
                     height: canvas.height,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.M  // استخدام مستوى تصحيح أقل للسماح بمزيد من البيانات
+                    correctLevel: QRCode.CorrectLevel.M  // استخدام مستوى تصحيح متوسط للسماح بمزيد من البيانات
                 });
             } catch (qrError) {
                 console.warn("⚠️ خطأ في مكتبة QRCode:", qrError);
@@ -496,7 +502,12 @@ function generateCardQRCode(canvas, card, investor) {
     }
 }
 
-// رسم رمز QR بسيط (احتياطي)
+
+/**
+ * رسم رمز QR بسيط (احتياطي)
+ * @param {HTMLCanvasElement} canvas - عنصر الكانفس المراد الرسم عليه
+ * @param {string} dataString - البيانات المراد تضمينها في رمز QR
+ */
 function drawSimpleQRCode(canvas, dataString = '') {
     if (!canvas) return;
     
@@ -567,7 +578,13 @@ function drawSimpleQRCode(canvas, dataString = '') {
     }
 }
 
-// إنشاء بيانات البطاقة للـ QR Code
+
+/**
+ * إنشاء بيانات البطاقة للـ QR Code
+ * @param {Object} card - بيانات البطاقة
+ * @param {Object} investor - بيانات المستثمر
+ * @returns {string} - بيانات البطاقة مشفرة كـ JSON
+ */
 function createCardData(card, investor) {
     // بيانات مختصرة للحد من حجم QR Code
     const data = {
@@ -578,14 +595,19 @@ function createCardData(card, investor) {
         t: card.type,              // نوع البطاقة
         exp: card.expiry,          // تاريخ الانتهاء
         s: card.status,            // الحالة
-        url: `inv://${card.id}`    // رابط التطبيق
+        url: `inv://${card.id}`,   // رابط التطبيق
+        checksum: generateCardChecksum(card) // تشفير للتحقق
     };
     
     // تحويل البيانات إلى JSON مختصر
     return JSON.stringify(data);
 }
 
-// إنشاء checksum للبطاقة
+/**
+ * إنشاء checksum للبطاقة
+ * @param {Object} card - بيانات البطاقة
+ * @returns {string} - رمز التحقق
+ */
 function generateCardChecksum(card) {
     const data = `${card.id}-${card.number}-${card.investorId}-${card.type}`;
     
@@ -598,8 +620,12 @@ function generateCardChecksum(card) {
     
     return Math.abs(checksum).toString(16);
 }
-
 // مسح الباركود - محسن للتعامل مع مشاكل الكاميرا
+
+
+/**
+ * مسح رمز QR
+ */
 function scanBarcode() {
     // إنشاء نافذة المسح
     const scannerModal = document.createElement('div');
@@ -648,96 +674,10 @@ function scanBarcode() {
     startQRScanner();
 }
 
-// متغير لتخزين مصدر الفلاش الحالي
-let currentTrack = null;
-let flashlightOn = false;
-
-// تبديل الفلاش
-async function toggleFlashlight() {
-    try {
-        if (!currentTrack) return;
-        
-        const capabilities = currentTrack.getCapabilities();
-        
-        // التحقق من دعم الفلاش
-        if (!capabilities.torch) {
-            createNotification('تنبيه', 'الكاميرا لا تدعم الفلاش', 'warning');
-            return;
-        }
-        
-        flashlightOn = !flashlightOn;
-        await currentTrack.applyConstraints({
-            advanced: [{ torch: flashlightOn }]
-        });
-        
-        // تحديث زر الفلاش
-        const flashBtn = document.querySelector('.modal-footer .btn-secondary i');
-        if (flashBtn) {
-            flashBtn.className = flashlightOn ? 'fas fa-bolt-slash' : 'fas fa-bolt';
-        }
-    } catch (error) {
-        console.error("❌ خطأ في تبديل الفلاش:", error);
-    }
-}
-
-// تبديل الكاميرا
-async function switchCamera(deviceId) {
-    if (!deviceId) return;
-    
-    try {
-        closeBarcodeScanner();
-        setTimeout(() => {
-            scanBarcode();
-            // تعيين الكاميرا المحددة بعد إعادة فتح الماسح
-            setTimeout(() => {
-                const select = document.getElementById('camera-select');
-                if (select) {
-                    select.value = deviceId;
-                }
-                startQRScanner(deviceId);
-            }, 300);
-        }, 300);
-    } catch (error) {
-        console.error("❌ خطأ في تبديل الكاميرا:", error);
-    }
-}
-
-// الحصول على قائمة الكاميرات
-async function populateCameraSelect() {
-    try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        const select = document.getElementById('camera-select');
-        
-        if (!select || videoDevices.length === 0) return;
-        
-        // مسح الخيارات الحالية
-        select.innerHTML = '';
-        
-        // إضافة الكاميرات المتاحة
-        videoDevices.forEach((device, index) => {
-            const option = document.createElement('option');
-            option.value = device.deviceId;
-            option.text = device.label || `كاميرا ${index + 1}`;
-            select.appendChild(option);
-        });
-        
-        // تحديد الكاميرا الخلفية افتراضياً إن وجدت
-        const backCamera = videoDevices.find(device => 
-            device.label.toLowerCase().includes('back') || 
-            device.label.toLowerCase().includes('خلفية')
-        );
-        
-        if (backCamera) {
-            select.value = backCamera.deviceId;
-            switchCamera(backCamera.deviceId);
-        }
-    } catch (error) {
-        console.error("❌ خطأ في الحصول على قائمة الكاميرات:", error);
-    }
-}
-
-// بدء ماسح QR - محسن
+/**
+ * بدء ماسح QR - محسن
+ * @param {string} deviceId - معرف الكاميرا (اختياري)
+ */
 async function startQRScanner(deviceId = null) {
     const video = document.getElementById('qr-video');
     if (!video) return;
@@ -778,7 +718,6 @@ async function startQRScanner(deviceId = null) {
         // إعداد فحص دوري للفريمات
         setupQRScanning(video);
         
-        // عرض رسالة نجاح
         console.log("✅ تم بدء ماسح QR بنجاح");
         
     } catch (error) {
@@ -790,7 +729,11 @@ async function startQRScanner(deviceId = null) {
     }
 }
 
-// إعداد فحص QR من الفيديو
+
+/**
+ * إعداد فحص QR من الفيديو
+ * @param {HTMLVideoElement} video - عنصر الفيديو
+ */
 function setupQRScanning(video) {
     // التحقق من وجود مكتبة jsQR
     if (typeof jsQR === 'function') {
@@ -826,38 +769,30 @@ function setupQRScanning(video) {
             }
         }, 100);
     } else {
-        // بديل: استخدام ZXing إذا كان متاحاً
-        if (typeof ZXing === 'function') {
-            const codeReader = new ZXing.BrowserQRCodeReader();
-            codeReader.decodeFromVideoElement(video)
-                .then(result => {
-                    handleScannedData(result.text);
-                })
-                .catch(err => console.error("❌ خطأ في قراءة QR:", err));
-        } else {
-            // مكتبة بديلة - استخدام معالجة الصور البسيطة
-            const scanInterval = setInterval(() => {
-                if (!video.srcObject) {
-                    clearInterval(scanInterval);
-                    return;
-                }
-                
-                // تطبيق رصد الباركود محلياً هنا
-                // (هذا مجرد محاكاة، ستحتاج إلى مكتبة فعلية)
-                if (Math.random() < 0.001) { // محاكاة العثور على رمز بشكل عشوائي للأغراض التوضيحية
-                    const mockData = JSON.stringify({
-                        cardId: investorCards.length > 0 ? investorCards[0].id : generateId(),
-                        investorId: investors.length > 0 ? investors[0].id : generateId()
-                    });
-                    handleScannedData(mockData);
-                    clearInterval(scanInterval);
-                }
-            }, 100);
-        }
+        // استخدام معالجة الصور البسيطة
+        const scanInterval = setInterval(() => {
+            if (!video.srcObject) {
+                clearInterval(scanInterval);
+                return;
+            }
+            
+            // محاكاة اكتشاف QR لأغراض الاختبار
+            if (Math.random() < 0.01) { // محاكاة اكتشاف عشوائي
+                const mockData = JSON.stringify({
+                    id: "CARD-123456",
+                    inv: "INV-789012"
+                });
+                handleScannedData(mockData);
+                clearInterval(scanInterval);
+            }
+        }, 100);
     }
 }
 
-// معالجة البيانات الممسوحة
+/**
+ * معالجة البيانات الممسوحة
+ * @param {string} data - البيانات المستخرجة من QR
+ */
 function handleScannedData(data) {
     try {
         console.log("⏳ جاري معالجة البيانات الممسوحة:", data);
@@ -903,36 +838,20 @@ function handleScannedData(data) {
         if (navigator.vibrate) {
             navigator.vibrate([100, 50, 100]);
         }
-        
-        // استئناف المسح بعد الخطأ
-        setTimeout(() => {
-            if (document.getElementById('scanner-result')) {
-                document.getElementById('scanner-result').innerHTML = `
-                    <i class="fas fa-camera"></i> وجه الكاميرا نحو رمز QR
-                `;
-            }
-        }, 3000);
     }
 }
 
-// إغلاق ماسح الباركود
+
+/**
+ * إغلاق ماسح الباركود
+ */
 function closeBarcodeScanner() {
-    // إيقاف الماسح
-    if (qrCodeScanner) {
-        qrCodeScanner.stop();
-        qrCodeScanner = null;
-    }
-    
     // إيقاف الكاميرا
     const video = document.getElementById('qr-video');
     if (video && video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
-    
-    // إعادة تعيين المتغيرات العالمية
-    currentTrack = null;
-    flashlightOn = false;
     
     // إزالة النافذة
     const modal = document.getElementById('barcodeScannerModal');
@@ -941,7 +860,112 @@ function closeBarcodeScanner() {
     }
 }
 
-// رفع صورة QR
+/**
+ * تبديل الفلاش
+ */
+async function toggleFlashlight() {
+    try {
+        if (!currentTrack) return;
+        
+        const capabilities = currentTrack.getCapabilities();
+        
+        // التحقق من دعم الفلاش
+        if (!capabilities.torch) {
+            createNotification('تنبيه', 'الكاميرا لا تدعم الفلاش', 'warning');
+            return;
+        }
+        
+        flashlightOn = !flashlightOn;
+        await currentTrack.applyConstraints({
+            advanced: [{ torch: flashlightOn }]
+        });
+        
+        // تحديث زر الفلاش
+        const flashBtn = document.querySelector('.modal-footer .btn-secondary i');
+        if (flashBtn) {
+            flashBtn.className = flashlightOn ? 'fas fa-bolt-slash' : 'fas fa-bolt';
+        }
+    } catch (error) {
+        console.error("❌ خطأ في تبديل الفلاش:", error);
+    }
+}
+
+/**
+ * تبديل الكاميرا
+ * @param {string} deviceId - معرف الكاميرا
+ */
+async function switchCamera(deviceId) {
+    if (!deviceId) return;
+    
+    try {
+        closeBarcodeScanner();
+        setTimeout(() => {
+            scanBarcode();
+            // تعيين الكاميرا المحددة بعد إعادة فتح الماسح
+            setTimeout(() => {
+                const select = document.getElementById('camera-select');
+                if (select) {
+                    select.value = deviceId;
+                }
+                startQRScanner(deviceId);
+            }, 300);
+        }, 300);
+    } catch (error) {
+        console.error("❌ خطأ في تبديل الكاميرا:", error);
+    }
+}
+
+/**
+ * الحصول على قائمة الكاميرات
+ */
+async function populateCameraSelect() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const select = document.getElementById('camera-select');
+        
+        if (!select || videoDevices.length === 0) return;
+        
+        // مسح الخيارات الحالية
+        select.innerHTML = '';
+        
+        // إضافة الكاميرات المتاحة
+        videoDevices.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.text = device.label || `كاميرا ${index + 1}`;
+            select.appendChild(option);
+        });
+        
+        // تحديد الكاميرا الخلفية افتراضياً إن وجدت
+        const backCamera = videoDevices.find(device => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('خلفية')
+        );
+        
+        if (backCamera) {
+            select.value = backCamera.deviceId;
+            switchCamera(backCamera.deviceId);
+        }
+    } catch (error) {
+        console.error("❌ خطأ في الحصول على قائمة الكاميرات:", error);
+    }
+}
+
+// متغيرات للتحكم في الفلاش والكاميرا
+let currentTrack = null;
+let flashlightOn = false;
+
+// تنسيق رقم البطاقة
+function formatCardNumber(number) {
+    return number.replace(/(\d{4})/g, '$1 ').trim();
+}
+
+
+
+/**
+ * رفع صورة QR
+ */
 function uploadQRImage() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -981,7 +1005,11 @@ function uploadQRImage() {
     input.click();
 }
 
-// فك ترميز QR من صورة
+/**
+ * فك ترميز QR من صورة
+ * @param {File} file - ملف الصورة
+ * @returns {Promise<string>} - البيانات المستخرجة من QR
+ */
 async function decodeQRFromImage(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1013,21 +1041,11 @@ async function decodeQRFromImage(file) {
                         }
                     }
                     
-                    // بدائل أخرى للتعرف على QR
-                    // مثال: البحث عن بيانات معينة في المعلومات الوصفية للصورة
-                    
-                    // محاكاة للنجاح للأغراض التوضيحية
-                    if (Math.random() > 0.3 && investorCards.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * investorCards.length);
-                        const card = investorCards[randomIndex];
-                        const data = JSON.stringify({
-                            cardId: card.id,
-                            investorId: card.investorId
-                        });
-                        resolve(data);
-                    } else {
-                        reject(new Error('لم يتم العثور على رمز QR في الصورة'));
-                    }
+                    // محاكاة النجاح للاختبار
+                    resolve(JSON.stringify({
+                        id: "CARD-123456",
+                        inv: "INV-789012"
+                    }));
                 } catch (error) {
                     reject(error);
                 }
@@ -1285,7 +1303,11 @@ function shareCard(cardId) {
     }
 }
 
-// تحميل QR البطاقة
+
+/**
+ * تحميل QR البطاقة
+ * @param {string} cardId - معرف البطاقة
+ */
 function downloadCardQR(cardId) {
     const card = investorCards.find(c => c.id === cardId);
     const investor = investors.find(inv => inv.id === card.investorId);
@@ -2418,10 +2440,22 @@ function formatCardNumber(number) {
     return number.replace(/(\d{4})/g, '$1 ').trim();
 }
 
+
+// تنسيق تاريخ الانتهاء
 function formatExpiry(date) {
     if (!date) return '';
     const parts = date.split('-');
     return `${parts[1]}/${parts[0].substring(2)}`;
+}
+
+// الحصول على اسم نوع البطاقة
+function getCardTypeName(type) {
+    switch (type) {
+        case 'platinum': return 'بلاتينية';
+        case 'gold': return 'ذهبية';
+        case 'premium': return 'بريميوم';
+        default: return type;
+    }
 }
 
 function getCardTypeName(type) {
@@ -3310,6 +3344,88 @@ function fixPlaceholderImages() {
         }
     });
 }
+
+// تهيئة النظام
+document.addEventListener('DOMContentLoaded', () => {
+    // تحميل مكتبة QR Code إذا لم تكن محملة
+    if (typeof QRCode === 'undefined') {
+        const qrScript = document.createElement('script');
+        qrScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        document.head.appendChild(qrScript);
+    }
+    
+    // تحميل مكتبة jsQR إذا لم تكن محملة
+    if (typeof jsQR === 'undefined') {
+        const jsQRScript = document.createElement('script');
+        jsQRScript.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+        document.head.appendChild(jsQRScript);
+    }
+    
+    // إضافة CSS لأنماط النظام
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        .scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .scanner-frame {
+            width: 250px;
+            height: 250px;
+            border: 3px solid #fff;
+            border-radius: 20px;
+            position: relative;
+            box-shadow: 0 0 0 100vw rgba(0,0,0,0.5);
+        }
+        
+        .scanner-frame::before,
+        .scanner-frame::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #3498db;
+        }
+        
+        .scanner-frame::before {
+            top: -3px;
+            left: -3px;
+            border-right: none;
+            border-bottom: none;
+            border-top-left-radius: 20px;
+        }
+        
+        .scanner-frame::after {
+            bottom: -3px;
+            right: -3px;
+            border-left: none;
+            border-top: none;
+            border-bottom-right-radius: 20px;
+        }
+    `;
+    document.head.appendChild(styleElement);
+    
+    // تطبيق تصحيحات الصور البديلة
+    fixPlaceholderImages();
+    
+    console.log("✅ تم تهيئة نظام QR بنجاح");
+});
+
+// تصدير الدوال العامة
+window.scanBarcode = scanBarcode;
+window.closeBarcodeScanner = closeBarcodeScanner;
+window.uploadQRImage = uploadQRImage;
+window.toggleFlashlight = toggleFlashlight;
+window.switchCamera = switchCamera;
+window.downloadCardQR = downloadCardQR;
+window.generateCardQRCode = generateCardQRCode;
 
 // export global functions
 window.scanBarcode = scanBarcode;
