@@ -104,6 +104,33 @@ function setupFirebaseCardsSync() {
         console.error('خطأ في إعداد مزامنة البطاقات:', error);
     }
 }
+
+// مستمع لحالة تسجيل الدخول
+document.addEventListener('DOMContentLoaded', function() {
+    // الاستماع لتغييرات حالة المستخدم
+    if (typeof firebase !== 'undefined') {
+        firebase.auth().onAuthStateChanged(function(user) {
+            window.currentUser = user;
+            
+            if (user) {
+                // المستخدم مسجل دخول
+                console.log('المستخدم مسجل دخول (بطاقات المستثمرين):', user.email);
+                
+                // تحديث حالة المزامنة من localStorage
+                window.syncActive = localStorage.getItem('syncEnabled') === 'true';
+                
+                // إعداد مزامنة البطاقات إذا كانت المزامنة مفعلة
+                if (window.syncActive && cardSettings.enableRealTimeUpdates) {
+                    setupFirebaseCardsSync();
+                }
+            } else {
+                // المستخدم غير مسجل دخول
+                console.log('المستخدم غير مسجل دخول (بطاقات المستثمرين)');
+                window.syncActive = false;
+            }
+        });
+    }
+});
 // مزامنة البطاقات مع Firebase
 function syncCardsToFirebase() {
     if (!window.firebaseApp || !window.firebaseApp.database || typeof firebase === 'undefined') {
