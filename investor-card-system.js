@@ -3669,3 +3669,687 @@ window.loadCardInvestors = loadCardInvestors;
 window.openCreateCardModal = openCreateCardModal;
 window.openModal = openModal;
 window.closeModal = closeModal;
+
+// إصلاح مشكلة إنشاء البطاقات الجديدة
+
+// 1. دالة للتشخيص وإصلاح المشاكل
+function diagnosisAndFixCardCreation() {
+    console.log("🔍 بدء تشخيص مشاكل إنشاء البطاقات...");
+    
+    // التحقق من وجود العناصر المطلوبة في DOM
+    const createCardBtn = document.querySelector('.btn-add-card, .add-card-button, button[onclick*="openCreateCardModal"]');
+    const createCardModal = document.getElementById('createCardModal');
+    const createCardForm = document.getElementById('createCardForm');
+    const cardInvestor = document.getElementById('cardInvestor');
+    const cardExpiry = document.getElementById('cardExpiry');
+    const cardTypeRadios = document.querySelectorAll('input[name="cardType"]');
+    
+    // عرض نتائج التشخيص
+    console.log("تم العثور على زر إنشاء البطاقة:", !!createCardBtn);
+    console.log("تم العثور على النافذة المنبثقة:", !!createCardModal);
+    console.log("تم العثور على نموذج إنشاء البطاقة:", !!createCardForm);
+    console.log("تم العثور على قائمة المستثمرين:", !!cardInvestor);
+    console.log("تم العثور على حقل تاريخ الانتهاء:", !!cardExpiry);
+    console.log("تم العثور على أزرار اختيار نوع البطاقة:", cardTypeRadios.length);
+    
+    // فحص المكتبات المطلوبة
+    console.log("مكتبة QRCode متاحة:", typeof QRCode !== 'undefined');
+    
+    // إصلاح المشكلات المحتملة:
+    
+    // 1. إعادة ربط زر الإنشاء
+    if (createCardBtn) {
+        createCardBtn.onclick = function() {
+            console.log("✅ تم النقر على زر إنشاء البطاقة");
+            openCreateCardModal();
+        };
+        console.log("✅ تم إعادة ربط زر إنشاء البطاقة");
+    } else {
+        console.error("❌ لم يتم العثور على زر إنشاء البطاقة - إنشاء زر بديل");
+        
+        // إنشاء زر بديل
+        const headerActions = document.querySelector('.header-actions, .page-header, .card-header, header');
+        if (headerActions) {
+            const newButton = document.createElement('button');
+            newButton.className = 'btn btn-primary btn-add-card';
+            newButton.innerHTML = '<i class="fas fa-plus"></i> إنشاء بطاقة جديدة';
+            newButton.onclick = openCreateCardModal;
+            headerActions.appendChild(newButton);
+            console.log("✅ تم إنشاء زر بديل");
+        }
+    }
+    
+    // 2. التحقق من نافذة الإنشاء وإصلاحها إذا لزم الأمر
+    if (!createCardModal) {
+        console.error("❌ لم يتم العثور على النافذة المنبثقة - إنشاء نافذة بديلة");
+        // إنشاء نافذة منبثقة بديلة
+        createCreateCardModal();
+        console.log("✅ تم إنشاء نافذة منبثقة بديلة");
+    }
+    
+    // 3. التحقق من وجود المستثمرين
+    if (cardInvestor && cardInvestor.options.length <= 1) {
+        console.warn("⚠️ لا يوجد مستثمرين في القائمة المنسدلة");
+        console.log("محاولة إعادة تحميل المستثمرين...");
+        loadCardInvestors();
+    }
+    
+    // 4. إعادة تعريف دالة إنشاء البطاقة لتكون أكثر مرونة
+    window.createInvestorCard = function() {
+        try {
+            console.log("🔄 بدء عملية إنشاء البطاقة");
+            
+            // الحصول على قيم الإدخال
+            const investorSelect = document.getElementById('cardInvestor');
+            const expiryInput = document.getElementById('cardExpiry');
+            const cardTypeRadios = document.querySelectorAll('input[name="cardType"]');
+            
+            if (!investorSelect) {
+                throw new Error("لم يتم العثور على حقل اختيار المستثمر");
+            }
+            
+            const investorId = investorSelect.value;
+            const expiry = expiryInput ? expiryInput.value : new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
+            
+            // تحديد نوع البطاقة المحدد
+            let cardType = 'premium'; // القيمة الافتراضية
+            cardTypeRadios.forEach(radio => {
+                if (radio.checked) {
+                    cardType = radio.value;
+                }
+            });
+            
+            console.log("قيم الإدخال:", { investorId, expiry, cardType });
+            
+            // التحقق من صحة الإدخال
+            if (!investorId) {
+                alert('يرجى اختيار المستثمر');
+                return;
+            }
+            
+            // التحقق من وجود مصفوفة البطاقات
+            if (!Array.isArray(window.investorCards)) {
+                console.warn("⚠️ مصفوفة البطاقات غير موجودة، سيتم إنشاؤها");
+                window.investorCards = [];
+            }
+            
+            // إنشاء البطاقة الجديدة
+            const newCard = {
+                id: generateId(),
+                investorId: investorId,
+                number: generateCardNumber(),
+                type: cardType,
+                expiry: expiry,
+                status: 'active',
+                createdAt: new Date().toISOString(),
+                transactions: [],
+                limits: {
+                    dailyLimit: cardType === 'platinum' ? 10000000 : cardType === 'gold' ? 5000000 : 2000000,
+                    monthlyLimit: cardType === 'platinum' ? 100000000 : cardType === 'gold' ? 50000000 : 20000000,
+                    withdrawalLimit: cardType === 'platinum' ? 5000000 : cardType === 'gold' ? 2500000 : 1000000
+                },
+                features: getCardFeatures(cardType)
+            };
+            
+            // إضافة البطاقة للمصفوفة
+            investorCards.push(newCard);
+            console.log("✅ تمت إضافة البطاقة:", newCard);
+            
+            // حفظ البطاقات
+            if (typeof saveInvestorCards === 'function') {
+                saveInvestorCards();
+            } else {
+                // حفظ في التخزين المحلي فقط إذا لم تكن الدالة موجودة
+                localStorage.setItem('investorCards', JSON.stringify(investorCards));
+                console.log("✅ تم حفظ البطاقات في التخزين المحلي");
+            }
+            
+            // مزامنة مع Firebase إذا كان متاحًا
+            if (typeof syncCardToFirebase === 'function') {
+                syncCardToFirebase(newCard);
+            }
+            
+            // إغلاق النافذة المنبثقة
+            closeModal('createCardModal');
+            
+            // تحديث العرض
+            if (typeof updateCardsDisplay === 'function') {
+                updateCardsDisplay();
+            }
+            
+            if (typeof updateCardsBadges === 'function') {
+                updateCardsBadges();
+            }
+            
+            // إظهار إشعار النجاح
+            if (typeof createNotification === 'function') {
+                createNotification('نجاح', 'تم إنشاء البطاقة بنجاح', 'success');
+            } else {
+                alert('تم إنشاء البطاقة بنجاح');
+            }
+            
+            console.log("✅ اكتملت عملية إنشاء البطاقة بنجاح");
+            return true;
+            
+        } catch (error) {
+            console.error("❌ حدث خطأ أثناء إنشاء البطاقة:", error);
+            alert(`حدث خطأ أثناء إنشاء البطاقة: ${error.message}`);
+            return false;
+        }
+    };
+    
+    // 5. إعادة تعريف دالة فتح النافذة المنبثقة
+    window.openCreateCardModal = function() {
+        try {
+            console.log("🔄 محاولة فتح نافذة إنشاء البطاقة");
+            
+            const form = document.getElementById('createCardForm');
+            if (form) {
+                form.reset();
+            }
+            
+            // تحميل المستثمرين
+            if (typeof loadCardInvestors === 'function') {
+                loadCardInvestors();
+            }
+            
+            // فتح النافذة المنبثقة
+            if (typeof openModal === 'function') {
+                openModal('createCardModal');
+            } else {
+                // فتح النافذة المنبثقة بطريقة بديلة
+                const modal = document.getElementById('createCardModal');
+                if (modal) {
+                    modal.classList.add('active');
+                    console.log("✅ تم فتح النافذة المنبثقة");
+                } else {
+                    console.error("❌ لم يتم العثور على النافذة المنبثقة");
+                    createCreateCardModal();
+                }
+            }
+            
+            // تحديث معاينة البطاقة
+            if (typeof updateCardPreview === 'function') {
+                updateCardPreview();
+            }
+            
+            console.log("✅ تم فتح نافذة إنشاء البطاقة بنجاح");
+            return true;
+            
+        } catch (error) {
+            console.error("❌ حدث خطأ أثناء فتح نافذة إنشاء البطاقة:", error);
+            // إنشاء النافذة المنبثقة بديلة إذا حدث خطأ
+            createCreateCardModal();
+            return false;
+        }
+    };
+    
+    console.log("✅ اكتمل تشخيص وإصلاح مشاكل إنشاء البطاقات");
+    return true;
+}
+
+// وظيفة إنشاء نافذة منبثقة بديلة
+function createCreateCardModal() {
+    // التحقق من عدم وجود النافذة بالفعل
+    if (document.getElementById('createCardModal')) {
+        return;
+    }
+    
+    // إنشاء عنصر النافذة المنبثقة
+    const modal = document.createElement('div');
+    modal.id = 'createCardModal';
+    modal.className = 'modal-overlay';
+    
+    // إنشاء HTML للنافذة المنبثقة
+    modal.innerHTML = `
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">إنشاء بطاقة جديدة</h2>
+                <div class="modal-close" onclick="closeModal('createCardModal')">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="createCardForm">
+                    <div class="form-group">
+                        <label for="cardInvestor">المستثمر</label>
+                        <select id="cardInvestor" class="form-control" required>
+                            <option value="">اختر المستثمر</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cardExpiry">تاريخ الانتهاء</label>
+                        <input type="month" id="cardExpiry" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>نوع البطاقة</label>
+                        <div class="card-types-grid">
+                            <div class="card-type-option premium">
+                                <input type="radio" name="cardType" id="cardTypePremium" value="premium" checked>
+                                <label for="cardTypePremium">
+                                    <i class="fas fa-star"></i>
+                                    <span>بريميوم</span>
+                                </label>
+                            </div>
+                            <div class="card-type-option gold">
+                                <input type="radio" name="cardType" id="cardTypeGold" value="gold">
+                                <label for="cardTypeGold">
+                                    <i class="fas fa-crown"></i>
+                                    <span>ذهبية</span>
+                                </label>
+                            </div>
+                            <div class="card-type-option platinum">
+                                <input type="radio" name="cardType" id="cardTypePlatinum" value="platinum">
+                                <label for="cardTypePlatinum">
+                                    <i class="fas fa-gem"></i>
+                                    <span>بلاتينية</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>معاينة البطاقة</label>
+                        <div id="cardPreview" class="card-preview-container"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-light" onclick="closeModal('createCardModal')">إلغاء</button>
+                <button class="btn btn-primary" onclick="createInvestorCard()">إنشاء البطاقة</button>
+            </div>
+        </div>
+    `;
+    
+    // إضافة النافذة المنبثقة إلى DOM
+    document.body.appendChild(modal);
+    
+    // إضافة نمط CSS للنافذة المنبثقة
+    const style = document.createElement('style');
+    style.textContent = `
+        .card-types-grid {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .card-type-option {
+            flex: 1;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .card-type-option.premium {
+            background-color: rgba(52, 73, 94, 0.1);
+        }
+        
+        .card-type-option.gold {
+            background-color: rgba(241, 196, 15, 0.1);
+        }
+        
+        .card-type-option.platinum {
+            background-color: rgba(149, 165, 166, 0.1);
+        }
+        
+        .card-type-option.selected {
+            border-color: #3498db;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+        
+        .card-type-option input[type="radio"] {
+            display: none;
+        }
+        
+        .card-type-option label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        .card-type-option i {
+            font-size: 24px;
+        }
+        
+        .card-type-option.premium i {
+            color: #34495e;
+        }
+        
+        .card-type-option.gold i {
+            color: #f39c12;
+        }
+        
+        .card-type-option.platinum i {
+            color: #7f8c8d;
+        }
+        
+        .card-preview-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background-color: white;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+        
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .modal-title {
+            margin: 0;
+            font-size: 18px;
+        }
+        
+        .modal-close {
+            cursor: pointer;
+            font-size: 18px;
+            color: #777;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-light {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        .btn-light:hover {
+            background-color: #e9ecef;
+        }
+        
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+    `;
+    
+    document.head.appendChild(style);
+    
+    // إضافة مستمع الأحداث لاختيار نوع البطاقة
+    setTimeout(() => {
+        document.querySelectorAll('.card-type-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.card-type-option').forEach(opt => 
+                    opt.classList.remove('selected'));
+                this.classList.add('selected');
+                this.querySelector('input[type="radio"]').checked = true;
+                if (typeof updateCardPreview === 'function') {
+                    updateCardPreview();
+                }
+            });
+        });
+        
+        // اختيار النوع الافتراضي
+        const defaultOption = document.querySelector('.card-type-option.premium');
+        if (defaultOption) {
+            defaultOption.classList.add('selected');
+            if (typeof updateCardPreview === 'function') {
+                updateCardPreview();
+            }
+        }
+        
+        // تحميل المستثمرين
+        if (typeof loadCardInvestors === 'function') {
+            loadCardInvestors();
+        } else {
+            // تعبئة القائمة المنسدلة من مصفوفة المستثمرين الحالية
+            const investorSelect = document.getElementById('cardInvestor');
+            if (investorSelect && Array.isArray(window.investors)) {
+                investorSelect.innerHTML = '<option value="">اختر المستثمر</option>';
+                window.investors.forEach(investor => {
+                    const option = document.createElement('option');
+                    option.value = investor.id;
+                    option.textContent = investor.name;
+                    investorSelect.appendChild(option);
+                });
+            }
+        }
+        
+        // تعيين تاريخ انتهاء افتراضي
+        const expiryInput = document.getElementById('cardExpiry');
+        if (expiryInput) {
+            const now = new Date();
+            const futureDate = new Date(now.getFullYear() + 3, now.getMonth());
+            expiryInput.value = futureDate.toISOString().slice(0, 7);
+        }
+    }, 100);
+    
+    console.log("✅ تم إنشاء نافذة إنشاء البطاقة بديلة");
+}
+
+// تحقق من وجود الدوال الضرورية وإنشائها إذا كانت غير موجودة
+function ensureRequiredFunctions() {
+    // تأكد من وجود وظيفة توليد المعرف
+    if (typeof window.generateId !== 'function') {
+        window.generateId = function() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2);
+        };
+    }
+    
+    // تأكد من وجود وظيفة توليد رقم البطاقة
+    if (typeof window.generateCardNumber !== 'function') {
+        window.generateCardNumber = function() {
+            const prefixes = {
+                'platinum': '5555',
+                'gold': '4444',
+                'premium': '3333'
+            };
+            
+            const cardType = document.querySelector('input[name="cardType"]:checked')?.value || 'premium';
+            const prefix = prefixes[cardType] || '3333';
+            
+            let number = prefix;
+            for (let i = 0; i < 12; i++) {
+                number += Math.floor(Math.random() * 10);
+            }
+            
+            return number;
+        };
+    }
+    
+    // تأكد من وجود وظيفة الحصول على مزايا البطاقة
+    if (typeof window.getCardFeatures !== 'function') {
+        window.getCardFeatures = function(cardType) {
+            switch (cardType) {
+                case 'platinum':
+                    return {
+                        profitBonus: 0.25,
+                        freeTransactions: -1,
+                        prioritySupport: true,
+                        vipAccess: true,
+                        insurance: true
+                    };
+                case 'gold':
+                    return {
+                        profitBonus: 0.15,
+                        freeTransactions: 50,
+                        prioritySupport: true,
+                        vipAccess: false,
+                        insurance: true
+                    };
+                case 'premium':
+                default:
+                    return {
+                        profitBonus: 0,
+                        freeTransactions: 20,
+                        prioritySupport: false,
+                        vipAccess: false,
+                        insurance: false
+                    };
+            }
+        };
+    }
+    
+    // تأكد من وجود وظيفة إغلاق النافذة المنبثقة
+    if (typeof window.closeModal !== 'function') {
+        window.closeModal = function(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        };
+    }
+    
+    // تأكد من وجود وظيفة مصفوفات البيانات الأساسية
+    if (!Array.isArray(window.investorCards)) {
+        window.investorCards = JSON.parse(localStorage.getItem('investorCards') || '[]');
+    }
+    
+    if (!Array.isArray(window.investors)) {
+        window.investors = JSON.parse(localStorage.getItem('investors') || '[]');
+    }
+    
+    console.log("✅ تم التأكد من وجود جميع الدوال الضرورية");
+}
+
+// وظيفة فتح وإغلاق القائمة المنسدلة
+function fixDropdownSelectors() {
+    // إضافة مستمعي الأحداث للقوائم المنسدلة
+    document.querySelectorAll('select.form-control').forEach(select => {
+        select.addEventListener('focus', function() {
+            this.size = 5; // يعرض 5 خيارات عند الفتح
+        });
+        
+        select.addEventListener('blur', function() {
+            this.size = 1; // يعود إلى العرض العادي عند إغلاق التركيز
+        });
+        
+        select.addEventListener('change', function() {
+            this.size = 1; // يغلق القائمة بعد التحديد
+            this.blur(); // يزيل التركيز
+        });
+    });
+    
+    console.log("✅ تم إصلاح القوائم المنسدلة");
+}
+
+// تنفيذ الإصلاحات عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("🔄 بدء تطبيق إصلاحات نظام البطاقات...");
+    
+    // التأكد من وجود الدوال الضرورية
+    ensureRequiredFunctions();
+    
+    // تشخيص وإصلاح مشاكل إنشاء البطاقات
+    diagnosisAndFixCardCreation();
+    
+    // إصلاح القوائم المنسدلة
+    fixDropdownSelectors();
+    
+    // إضافة زر لإظهار السجل بالكنسول
+    const debugBtn = document.createElement('button');
+    debugBtn.textContent = "عرض سجل التشخيص";
+    debugBtn.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        z-index: 9999;
+        padding: 10px 15px;
+        background-color: #34495e;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+    `;
+    debugBtn.onclick = function() {
+        console.log("=== حالة نظام البطاقات ===");
+        console.log("البطاقات:", window.investorCards);
+        console.log("المستثمرون:", window.investors);
+        diagnosisAndFixCardCreation();
+        alert("تم عرض معلومات التشخيص في وحدة التحكم");
+    };
+    document.body.appendChild(debugBtn);
+    
+    console.log("✅ تم تطبيق جميع الإصلاحات بنجاح");
+});
