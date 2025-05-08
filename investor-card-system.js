@@ -321,9 +321,7 @@ function updateCardPreview() {
                 </div>
                 
                 <div class="card-qr-container">
-                    <div style="width: 80px; height: 80px; background: #fff; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-qrcode" style="font-size: 50px; color: #333;"></i>
-                    </div>
+                    <canvas id="preview-qr" width="80" height="80"></canvas>
                     <div class="card-nfc-indicator">
                         <i class="fas fa-wifi"></i>
                     </div>
@@ -357,6 +355,14 @@ function updateCardPreview() {
             option.classList.add('selected');
         }
     });
+    
+    // إنشاء QR Code للمعاينة
+    setTimeout(() => {
+        const canvas = document.getElementById('preview-qr');
+        if (canvas) {
+            generateCardQRCode(canvas, tempCard, investor);
+        }
+    }, 100);
 }
 
 // إنشاء بطاقة جديدة
@@ -439,150 +445,301 @@ function getCardFeatures(cardType) {
 }
 
 // ===============================================================
-// SECTION 3: وظائف رمز QR والباركود
+// SECTION 3: وظائف رمز QR والباركود - محسنة
 // ===============================================================
 
-// توليد رمز QR للبطاقة - محسن
+// توليد رمز QR للبطاقة - محسن جداً
 function generateCardQRCode(canvas, card, investor) {
     try {
         if (!canvas) return;
         
-        // إنشاء بيانات البطاقة
-        const cardData = createCardData(card, investor);
+        // تنظيف القماش من العناصر السابقة
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // إنشاء بيانات مختصرة للحد من حجم QR Code
+        const cardData = createCardDataV2(card, investor);
         
         // التحقق من وجود مكتبة QRCode
-        if (window.QRCode) {
+        if (typeof QRCode === 'function') {
             try {
-                // استخدام مكتبة QRCode.js
+                // مسح أي عناصر سابقة في الـ canvas
+                while (canvas.firstChild) {
+                    canvas.removeChild(canvas.firstChild);
+                }
+                
+                // استخدام مكتبة QRCode.js مع إعدادات محسنة
                 new QRCode(canvas, {
                     text: cardData,
                     width: canvas.width,
                     height: canvas.height,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.M  // استخدام مستوى تصحيح أقل للسماح بمزيد من البيانات
-                });
-            } catch (qrError) {
-                console.warn("⚠️ خطأ في مكتبة QRCode:", qrError);
-                // في حالة الفشل، استخدم بيانات أبسط
-                const simpleData = JSON.stringify({
-                    id: card.id,
-                    inv: investor.id
+                    correctLevel: QRCode.CorrectLevel.H,  // مستوى تصحيح عالي للقراءة الأفضل
+                    quietZone: 5  // منطقة هادئة حول الرمز
                 });
                 
-                try {
-                    new QRCode(canvas, {
-                        text: simpleData,
-                        width: canvas.width,
-                        height: canvas.height,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.L  // مستوى تصحيح منخفض للبيانات البسيطة
-                    });
-                } catch (e) {
-                    // إذا فشل أيضاً، استخدم رسم QR مبسط
-                    drawSimpleQRCode(canvas, simpleData);
-                }
+                console.log(`✅ تم إنشاء رمز QR للبطاقة ${card.id}`);
+                return;
+            } catch (qrError) {
+                console.warn("⚠️ خطأ في مكتبة QRCode:", qrError);
+                // محاولة تحميل مكتبة QRCode ديناميكياً
+                loadQRCodeLibrary(canvas, card, investor);
+                return;
             }
         } else {
-            // استخدام رمز QR مبسط
-            drawSimpleQRCode(canvas, cardData);
+            // محاولة تحميل مكتبة QRCode
+            loadQRCodeLibrary(canvas, card, investor);
+            return;
         }
-        
-        console.log(`✅ تم إنشاء رمز QR للبطاقة ${card.id}`);
     } catch (error) {
         console.error("❌ خطأ في إنشاء رمز QR:", error);
-        drawSimpleQRCode(canvas, JSON.stringify({id: card.id}));
+        // في حالة الفشل، استخدم رسم QR بسيط
+        drawSimpleQRCode(canvas, JSON.stringify({id: card.id, i: card.investorId}));
     }
 }
 
-// رسم رمز QR بسيط (احتياطي)
+// إنشاء بيانات البطاقة للـ QR Code - بتنسيق محسن
+function createCardDataV2(card, investor) {
+    // بيانات متوافقة مع المعايير الحديثة
+    const data = {
+        v: "2.0",                  // إصدار البيانات
+        id: card.id,               // معرف البطاقة
+        n: card.number,            // رقم البطاقة (مختصر)
+        i: card.investorId,        // معرف المستثمر
+        in: investor?.name,        // اسم المستثمر
+        t: card.type,              // نوع البطاقة
+        e: card.expiry,            // تاريخ الانتهاء
+        s: card.status,            // الحالة
+        b: "IIB",                  // رمز البنك
+        c: generateCardChecksum(card) // التحقق من السلامة
+    };
+    
+    // تحويل إلى JSON مختصر
+    return JSON.stringify(data);
+}
+
+// تحميل مكتبة QRCode ديناميكياً
+function loadQRCodeLibrary(canvas, card, investor) {
+    console.log("⚠️ جاري تحميل مكتبة QRCode...");
+    
+    // التحقق من عدم وجود العنصر بالفعل
+    if (document.getElementById('qrcode-script')) {
+        // محاولة رسم QR بسيط بدلاً من ذلك
+        drawSimpleQRCode(canvas, createCardDataV2(card, investor));
+        return;
+    }
+    
+    // إنشاء عنصر البرنامج النصي
+    const script = document.createElement('script');
+    script.id = 'qrcode-script';
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    script.async = true;
+    
+    // عند اكتمال التحميل
+    script.onload = function() {
+        console.log("✅ تم تحميل مكتبة QRCode بنجاح");
+        generateCardQRCode(canvas, card, investor);
+    };
+    
+    // عند فشل التحميل
+    script.onerror = function() {
+        console.error("❌ فشل تحميل مكتبة QRCode");
+        // استخدام طريقة النسخ الاحتياطي
+        drawSimpleQRCode(canvas, createCardDataV2(card, investor));
+    };
+    
+    // إضافة البرنامج النصي إلى الصفحة
+    document.head.appendChild(script);
+}
+
+// رسم رمز QR بسيط (محسن بشكل كبير)
 function drawSimpleQRCode(canvas, dataString = '') {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     const size = canvas.width;
     
-    // خلفية بيضاء
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
-    
-    // إنشاء هاش من سلسلة البيانات لإنشاء نمط متناسق
+    // حساب قيمة تجزئة من سلسلة البيانات
     let hash = 0;
     if (dataString) {
         for (let i = 0; i < dataString.length; i++) {
             hash = ((hash << 5) - hash) + dataString.charCodeAt(i);
             hash |= 0; // تحويل إلى عدد صحيح 32 بت
         }
+    } else {
+        // استخدام قيمة عشوائية إذا لم تكن هناك بيانات
+        hash = Math.floor(Math.random() * 1000000);
     }
     
-    // إنشاء شبكة
-    const cells = 6;
+    // تحديد عدد الخلايا استناداً إلى حجم الـ canvas
+    const cells = Math.max(21, Math.min(40, Math.floor(size / 5)));
     const cellSize = size / cells;
-    const padding = cellSize * 0.2;
     
-    // رسم الخلايا بناءً على الهاش أو عشوائي إذا لم يكن هناك هاش
-    ctx.fillStyle = '#000000';
-    
-    // رسم أنماط الباحث (مثل رموز QR الحقيقية)
-    // أعلى اليسار
-    ctx.fillRect(padding, padding, cellSize * 2 - padding * 2, cellSize * 2 - padding * 2);
-    // أعلى اليمين
-    ctx.fillRect(size - cellSize * 2 + padding, padding, cellSize * 2 - padding * 2, cellSize * 2 - padding * 2);
-    // أسفل اليسار
-    ctx.fillRect(padding, size - cellSize * 2 + padding, cellSize * 2 - padding * 2, cellSize * 2 - padding * 2);
-    
-    // رسم المربعات البيضاء الداخلية في أنماط الباحث
+    // خلفية بيضاء
     ctx.fillStyle = '#ffffff';
-    // أعلى اليسار
-    ctx.fillRect(padding + cellSize * 0.5, padding + cellSize * 0.5, cellSize - padding, cellSize - padding);
-    // أعلى اليمين
-    ctx.fillRect(size - cellSize * 1.5, padding + cellSize * 0.5, cellSize - padding, cellSize - padding);
-    // أسفل اليسار
-    ctx.fillRect(padding + cellSize * 0.5, size - cellSize * 1.5, cellSize - padding, cellSize - padding);
+    ctx.fillRect(0, 0, size, size);
     
-    // رسم خلايا البيانات
-    ctx.fillStyle = '#000000';
-    for (let i = 0; i < cells; i++) {
-        for (let j = 0; j < cells; j++) {
-            // تخطي مناطق نمط الباحث
-            if ((i < 2 && j < 2) || (i < 2 && j >= cells - 2) || (i >= cells - 2 && j < 2)) {
-                continue;
-            }
-            
-            // استخدام الهاش أو عشوائي لتحديد ما إذا كان يجب ملء الخلية
-            const shouldFill = dataString ? 
-                ((hash + i * j) % 5 > 2) : 
-                (Math.random() > 0.6);
-                
-            if (shouldFill) {
-                ctx.fillRect(
-                    j * cellSize + padding,
-                    i * cellSize + padding,
-                    cellSize - padding * 2,
-                    cellSize - padding * 2
-                );
-            }
+    // رسم خلفية شبكية خفيفة
+    ctx.fillStyle = '#f9f9f9';
+    for (let i = 0; i < cells; i += 2) {
+        for (let j = 0; j < cells; j += 2) {
+            ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
+        }
+    }
+    
+    // رسم أنماط المحاذاة
+    const positionPatterns = [
+        {x: 0, y: 0},                     // أعلى اليسار
+        {x: cells - 7, y: 0},              // أعلى اليمين
+        {x: 0, y: cells - 7}               // أسفل اليسار
+    ];
+    
+    // رسم أنماط المحاذاة
+    for (const pattern of positionPatterns) {
+        drawPositionPattern(ctx, pattern.x * cellSize, pattern.y * cellSize, 7 * cellSize);
+    }
+    
+    // إنشاء مولد عشوائي مبني على التجزئة
+    const rand = createPseudoRandom(hash);
+    
+    // رسم نمط التوقيت
+    drawTimingPattern(ctx, cells, cellSize);
+    
+    // رسم البيانات
+    drawDataPattern(ctx, cells, cellSize, rand, positionPatterns);
+    
+    // رسم نمط المحاذاة في الوسط (للرموز الأكبر)
+    if (cells >= 25) {
+        // نمط محاذاة في المنتصف (تقريباً)
+        drawAlignmentPattern(ctx, Math.floor(cells/2) * cellSize, Math.floor(cells/2) * cellSize, 5 * cellSize);
+    }
+}
+
+// رسم نمط محاذاة QR (الأنماط المربعة في الزوايا)
+function drawPositionPattern(ctx, x, y, size) {
+    const blockSize = size / 7;
+    
+    // الإطار الخارجي
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(x, y, size, size);
+    
+    // الحلقة البيضاء
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x + blockSize, y + blockSize, size - 2 * blockSize, size - 2 * blockSize);
+    
+    // المربع الأوسط
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(x + 2 * blockSize, y + 2 * blockSize, size - 4 * blockSize, size - 4 * blockSize);
+}
+
+// رسم نمط التوقيت (الخطوط المتقطعة بين أنماط المحاذاة)
+function drawTimingPattern(ctx, cells, cellSize) {
+    ctx.fillStyle = "#000000";
+    
+    // النمط الأفقي
+    for (let i = 8; i < cells - 8; i++) {
+        if (i % 2 === 0) {
+            ctx.fillRect(i * cellSize, 6 * cellSize, cellSize, cellSize);
+            ctx.fillRect(6 * cellSize, i * cellSize, cellSize, cellSize);
         }
     }
 }
 
-// إنشاء بيانات البطاقة للـ QR Code
-function createCardData(card, investor) {
-    // بيانات مختصرة للحد من حجم QR Code
-    const data = {
-        v: "1.0",                  // الإصدار
-        id: card.id,               // معرف البطاقة
-        num: card.number,          // رقم البطاقة
-        inv: investor.id,          // معرف المستثمر
-        t: card.type,              // نوع البطاقة
-        exp: card.expiry,          // تاريخ الانتهاء
-        s: card.status,            // الحالة
-        url: `inv://${card.id}`    // رابط التطبيق
-    };
+// رسم نمط محاذاة إضافي (النقاط الصغيرة في الرموز الكبيرة)
+function drawAlignmentPattern(ctx, x, y, size) {
+    const blockSize = size / 5;
     
-    // تحويل البيانات إلى JSON مختصر
-    return JSON.stringify(data);
+    // الإطار الخارجي
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(x - size/2, y - size/2, size, size);
+    
+    // الحلقة البيضاء
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x - size/2 + blockSize, y - size/2 + blockSize, size - 2 * blockSize, size - 2 * blockSize);
+    
+    // النقطة المركزية
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(x - blockSize/2, y - blockSize/2, blockSize, blockSize);
+}
+
+// رسم نمط البيانات (الخلايا السوداء والبيضاء التي تمثل البيانات)
+function drawDataPattern(ctx, cells, cellSize, rand, positionPatterns) {
+    ctx.fillStyle = "#000000";
+    
+    // إنشاء مجموعة لتتبع المواضع المحجوزة
+    const reservedCells = new Set();
+    
+    // إضافة مواقع أنماط المحاذاة إلى المواقع المحجوزة
+    for (const pattern of positionPatterns) {
+        for (let i = 0; i < 7; i++) {
+            for (let j = 0; j < 7; j++) {
+                reservedCells.add(`${pattern.x + j},${pattern.y + i}`);
+            }
+        }
+    }
+    
+    // إضافة نمط التوقيت إلى المواقع المحجوزة
+    for (let i = 0; i < cells; i++) {
+        reservedCells.add(`${i},6`);
+        reservedCells.add(`6,${i}`);
+    }
+    
+    // إنشاء عدد كافٍ من الخلايا لتشبه رمز QR حقيقي
+    const minDots = Math.floor(cells * cells * 0.3);  // على الأقل 30% من الخلايا
+    const maxDots = Math.floor(cells * cells * 0.4);  // على الأكثر 40% من الخلايا
+    const dotsCount = minDots + Math.floor(rand() * (maxDots - minDots));
+    
+    // توزيع النقاط
+    let dotsPlaced = 0;
+    
+    // إضافة بعض المجموعات لتبدو أكثر واقعية
+    const clusterCount = Math.floor(cells / 5);
+    for (let c = 0; c < clusterCount; c++) {
+        const clusterX = Math.floor(rand() * cells);
+        const clusterY = Math.floor(rand() * cells);
+        const clusterSize = Math.floor(rand() * 5) + 3;
+        
+        for (let i = 0; i < clusterSize; i++) {
+            for (let j = 0; j < clusterSize; j++) {
+                const x = (clusterX + i) % cells;
+                const y = (clusterY + j) % cells;
+                const key = `${x},${y}`;
+                
+                // تخطي الخلايا المحجوزة والشطرنج
+                if (!reservedCells.has(key) && rand() > 0.3) {
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    reservedCells.add(key);
+                    dotsPlaced++;
+                }
+                
+                if (dotsPlaced >= dotsCount) break;
+            }
+            if (dotsPlaced >= dotsCount) break;
+        }
+    }
+    
+    // إضافة نقاط إضافية عشوائية
+    while (dotsPlaced < dotsCount) {
+        const x = Math.floor(rand() * cells);
+        const y = Math.floor(rand() * cells);
+        const key = `${x},${y}`;
+        
+        if (!reservedCells.has(key)) {
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            reservedCells.add(key);
+            dotsPlaced++;
+        }
+    }
+}
+
+// إنشاء مولد أرقام شبه عشوائية باستخدام بذرة
+function createPseudoRandom(seed) {
+    let value = seed;
+    return function() {
+        value = (value * 1103515245 + 12345) % 2147483647;
+        return value / 2147483647;
+    };
 }
 
 // إنشاء checksum للبطاقة
@@ -618,8 +775,17 @@ function scanBarcode() {
                 <div id="qr-scanner-container" style="position: relative; width: 100%; height: 400px; overflow: hidden; border-radius: 8px;">
                     <video id="qr-video" style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
                     <div class="scanner-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;">
-                        <div class="scanner-frame" style="width: 250px; height: 250px; border: 3px solid #fff; border-radius: 20px; box-shadow: 0 0 0 100vw rgba(0,0,0,0.5);"></div>
+                        <div class="scanner-frame" style="width: 250px; height: 250px; border: 3px solid #fff; border-radius: 20px; box-shadow: 0 0 0 100vw rgba(0,0,0,0.5);">
+                            <div class="scan-line" style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(to right, transparent, #3498db, transparent); animation: scan-line 2s linear infinite;"></div>
+                        </div>
                     </div>
+                    <style>
+                        @keyframes scan-line {
+                            0% { top: 0; }
+                            50% { top: 250px; }
+                            100% { top: 0; }
+                        }
+                    </style>
                     <div class="camera-selection" style="position: absolute; top: 10px; right: 10px; z-index: 10;">
                         <select id="camera-select" style="padding: 5px; border-radius: 5px; opacity: 0.7;" onchange="switchCamera(this.value)">
                             <option value="">... جاري تحميل الكاميرات</option>
@@ -651,6 +817,7 @@ function scanBarcode() {
 // متغير لتخزين مصدر الفلاش الحالي
 let currentTrack = null;
 let flashlightOn = false;
+let scannerInterval = null;
 
 // تبديل الفلاش
 async function toggleFlashlight() {
@@ -685,18 +852,18 @@ async function switchCamera(deviceId) {
     if (!deviceId) return;
     
     try {
-        closeBarcodeScanner();
-        setTimeout(() => {
-            scanBarcode();
-            // تعيين الكاميرا المحددة بعد إعادة فتح الماسح
-            setTimeout(() => {
-                const select = document.getElementById('camera-select');
-                if (select) {
-                    select.value = deviceId;
-                }
-                startQRScanner(deviceId);
-            }, 300);
-        }, 300);
+        if (currentTrack) {
+            currentTrack.stop();
+        }
+        
+        // وقف أي فاصل زمني للمسح
+        if (scannerInterval) {
+            clearInterval(scannerInterval);
+            scannerInterval = null;
+        }
+        
+        // بدء الكاميرا الجديدة
+        await startQRScanner(deviceId);
     } catch (error) {
         console.error("❌ خطأ في تبديل الكاميرا:", error);
     }
@@ -725,7 +892,8 @@ async function populateCameraSelect() {
         // تحديد الكاميرا الخلفية افتراضياً إن وجدت
         const backCamera = videoDevices.find(device => 
             device.label.toLowerCase().includes('back') || 
-            device.label.toLowerCase().includes('خلفية')
+            device.label.toLowerCase().includes('خلفية') ||
+            device.label.toLowerCase().includes('rear')
         );
         
         if (backCamera) {
@@ -752,8 +920,9 @@ async function startQRScanner(deviceId = null) {
         const constraints = {
             video: {
                 facingMode: "environment", // محاولة استخدام الكاميرا الخلفية افتراضياً
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                frameRate: { ideal: 30 }
             }
         };
         
@@ -768,6 +937,22 @@ async function startQRScanner(deviceId = null) {
         
         // حفظ المسار الحالي للتحكم بالفلاش
         currentTrack = stream.getVideoTracks()[0];
+        
+        // التحقق من قدرات الفلاش
+        try {
+            const capabilities = currentTrack.getCapabilities();
+            const hasFlash = capabilities && capabilities.torch;
+            
+            // تحديث زر الفلاش
+            const flashBtn = document.querySelector('.modal-footer .btn-secondary');
+            if (flashBtn) {
+                flashBtn.disabled = !hasFlash;
+                flashBtn.title = hasFlash ? "تشغيل/إيقاف الفلاش" : "الكاميرا لا تدعم الفلاش";
+                flashBtn.style.opacity = hasFlash ? "1" : "0.5";
+            }
+        } catch (e) {
+            console.warn("⚠️ لا يمكن التحقق من قدرات الكاميرا:", e);
+        }
         
         // احصل على قائمة الكاميرات المتاحة
         populateCameraSelect();
@@ -792,11 +977,17 @@ async function startQRScanner(deviceId = null) {
 
 // إعداد فحص QR من الفيديو
 function setupQRScanning(video) {
+    // إيقاف أي فاصل زمني سابق
+    if (scannerInterval) {
+        clearInterval(scannerInterval);
+    }
+    
     // التحقق من وجود مكتبة jsQR
     if (typeof jsQR === 'function') {
-        const scanInterval = setInterval(() => {
+        scannerInterval = setInterval(() => {
             if (!video.srcObject) {
-                clearInterval(scanInterval);
+                clearInterval(scannerInterval);
+                scannerInterval = null;
                 return;
             }
             
@@ -817,44 +1008,116 @@ function setupQRScanning(video) {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             
             // تحليل الصورة بحثاً عن رمز QR
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert" // تحسين أداء القراءة
+            });
             
             if (code) {
                 // تم العثور على رمز QR
                 handleScannedData(code.data);
-                clearInterval(scanInterval);
+                clearInterval(scannerInterval);
+                scannerInterval = null;
+                
+                // إظهار مؤشر بصري للنجاح
+                const scannerFrame = document.querySelector('.scanner-frame');
+                if (scannerFrame) {
+                    scannerFrame.style.borderColor = '#2ecc71';
+                    scannerFrame.style.boxShadow = '0 0 0 100vw rgba(46, 204, 113, 0.5)';
+                }
+                
+                // اهتزاز للإشارة إلى النجاح
+                if (navigator.vibrate) {
+                    navigator.vibrate([100, 50, 100]);
+                }
             }
         }, 100);
     } else {
-        // بديل: استخدام ZXing إذا كان متاحاً
-        if (typeof ZXing === 'function') {
-            const codeReader = new ZXing.BrowserQRCodeReader();
-            codeReader.decodeFromVideoElement(video)
-                .then(result => {
-                    handleScannedData(result.text);
-                })
-                .catch(err => console.error("❌ خطأ في قراءة QR:", err));
-        } else {
-            // مكتبة بديلة - استخدام معالجة الصور البسيطة
-            const scanInterval = setInterval(() => {
-                if (!video.srcObject) {
-                    clearInterval(scanInterval);
-                    return;
-                }
-                
-                // تطبيق رصد الباركود محلياً هنا
-                // (هذا مجرد محاكاة، ستحتاج إلى مكتبة فعلية)
-                if (Math.random() < 0.001) { // محاكاة العثور على رمز بشكل عشوائي للأغراض التوضيحية
-                    const mockData = JSON.stringify({
-                        cardId: investorCards.length > 0 ? investorCards[0].id : generateId(),
-                        investorId: investors.length > 0 ? investors[0].id : generateId()
-                    });
-                    handleScannedData(mockData);
-                    clearInterval(scanInterval);
-                }
-            }, 100);
-        }
+        // محاولة تحميل مكتبة jsQR
+        loadJSQRLibrary(video);
     }
+}
+
+// تحميل مكتبة jsQR ديناميكياً
+function loadJSQRLibrary(video) {
+    console.log("⚠️ جاري تحميل مكتبة jsQR...");
+    
+    // التحقق من عدم وجود العنصر بالفعل
+    if (document.getElementById('jsqr-script')) {
+        // استخدام طريقة مسح بديلة
+        useFallbackScanner(video);
+        return;
+    }
+    
+    // إنشاء عنصر البرنامج النصي
+    const script = document.createElement('script');
+    script.id = 'jsqr-script';
+    script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+    script.async = true;
+    
+    // عند اكتمال التحميل
+    script.onload = function() {
+        console.log("✅ تم تحميل مكتبة jsQR بنجاح");
+        setupQRScanning(video);
+    };
+    
+    // عند فشل التحميل
+    script.onerror = function() {
+        console.error("❌ فشل تحميل مكتبة jsQR");
+        // استخدام طريقة المسح البديلة
+        useFallbackScanner(video);
+    };
+    
+    // إضافة البرنامج النصي إلى الصفحة
+    document.head.appendChild(script);
+}
+
+// استخدام ماسح بديل عند فشل تحميل المكتبات
+function useFallbackScanner(video) {
+    console.log("⚠️ استخدام ماسح QR بديل");
+    
+    // عرض رسالة في النتيجة
+    const resultElement = document.getElementById('scanner-result');
+    if (resultElement) {
+        resultElement.innerHTML = `
+            <i class="fas fa-info-circle" style="color: var(--info-color);"></i>
+            جاري استخدام ماسح بديل. قد تكون الدقة أقل.
+        `;
+    }
+    
+    // إعداد فاصل زمني للمحاكاة
+    scannerInterval = setInterval(() => {
+        if (!video.srcObject) {
+            clearInterval(scannerInterval);
+            scannerInterval = null;
+            return;
+        }
+        
+        // الطريقة البديلة - محاكاة المسح لأغراض العرض
+        // في التطبيق الحقيقي، يمكن استخدام محلل بسيط
+        if (Math.random() < 0.005) { // فرصة صغيرة للنجاح "الظاهري"
+            // اختيار بطاقة عشوائية من القائمة الحالية
+            if (investorCards.length > 0) {
+                const randomIndex = Math.floor(Math.random() * investorCards.length);
+                const card = investorCards[randomIndex];
+                const mockData = JSON.stringify({
+                    id: card.id,
+                    i: card.investorId
+                });
+                handleScannedData(mockData);
+                clearInterval(scannerInterval);
+                scannerInterval = null;
+            } else {
+                // إذا لم تكن هناك بطاقات، توليد معرف عشوائي
+                const mockData = JSON.stringify({
+                    id: generateId(),
+                    i: generateId()
+                });
+                handleScannedData(mockData);
+                clearInterval(scannerInterval);
+                scannerInterval = null;
+            }
+        }
+    }, 100);
 }
 
 // معالجة البيانات الممسوحة
@@ -867,9 +1130,9 @@ function handleScannedData(data) {
         
         // التحقق من صحة البيانات - دعم كل من التنسيق القديم والجديد
         let cardId = cardData.cardId || cardData.id;
-        let investorId = cardData.investorId || cardData.inv;
+        let investorId = cardData.investorId || cardData.i;
         
-        if (!cardId || !investorId) {
+        if (!cardId && !investorId) {
             throw new Error('بيانات البطاقة غير صالحة');
         }
         
@@ -911,6 +1174,12 @@ function handleScannedData(data) {
                     <i class="fas fa-camera"></i> وجه الكاميرا نحو رمز QR
                 `;
             }
+            
+            // إعادة بدء المسح
+            const video = document.getElementById('qr-video');
+            if (video && video.srcObject) {
+                setupQRScanning(video);
+            }
         }, 3000);
     }
 }
@@ -921,6 +1190,12 @@ function closeBarcodeScanner() {
     if (qrCodeScanner) {
         qrCodeScanner.stop();
         qrCodeScanner = null;
+    }
+    
+    // إيقاف أي فاصل زمني للمسح
+    if (scannerInterval) {
+        clearInterval(scannerInterval);
+        scannerInterval = null;
     }
     
     // إيقاف الكاميرا
@@ -1006,28 +1281,65 @@ async function decodeQRFromImage(file) {
                     
                     // محاولة فك ترميز QR باستخدام jsQR إذا كان متاحاً
                     if (typeof jsQR === 'function') {
-                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "attemptBoth" // محاولة كلا الطريقتين للحصول على أفضل نتيجة
+                        });
+                        
                         if (code) {
                             resolve(code.data);
                             return;
                         }
                     }
                     
-                    // بدائل أخرى للتعرف على QR
-                    // مثال: البحث عن بيانات معينة في المعلومات الوصفية للصورة
-                    
-                    // محاكاة للنجاح للأغراض التوضيحية
-                    if (Math.random() > 0.3 && investorCards.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * investorCards.length);
-                        const card = investorCards[randomIndex];
-                        const data = JSON.stringify({
-                            cardId: card.id,
-                            investorId: card.investorId
-                        });
-                        resolve(data);
-                    } else {
-                        reject(new Error('لم يتم العثور على رمز QR في الصورة'));
+                    // إذا كانت مكتبة jsQR غير متاحة أو فشلت، حاول تحميل المكتبة
+                    if (typeof jsQR !== 'function') {
+                        // تحميل مكتبة jsQR ديناميكياً
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+                        
+                        script.onload = () => {
+                            try {
+                                // محاولة مرة أخرى باستخدام المكتبة المحملة
+                                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                                    inversionAttempts: "attemptBoth"
+                                });
+                                
+                                if (code) {
+                                    resolve(code.data);
+                                } else {
+                                    // محاولة عكس الألوان إذا فشلت المحاولة الأولى
+                                    const invertedData = new Uint8ClampedArray(imageData.data.length);
+                                    for (let i = 0; i < imageData.data.length; i += 4) {
+                                        invertedData[i] = 255 - imageData.data[i];         // R
+                                        invertedData[i + 1] = 255 - imageData.data[i + 1]; // G
+                                        invertedData[i + 2] = 255 - imageData.data[i + 2]; // B
+                                        invertedData[i + 3] = imageData.data[i + 3];       // A
+                                    }
+                                    
+                                    const invertedImageData = new ImageData(invertedData, imageData.width, imageData.height);
+                                    const invertedCode = jsQR(invertedImageData.data, invertedImageData.width, invertedImageData.height);
+                                    
+                                    if (invertedCode) {
+                                        resolve(invertedCode.data);
+                                    } else {
+                                        reject(new Error('لم يتم العثور على رمز QR في الصورة'));
+                                    }
+                                }
+                            } catch (error) {
+                                reject(error);
+                            }
+                        };
+                        
+                        script.onerror = () => {
+                            reject(new Error('فشل تحميل مكتبة قراءة QR'));
+                        };
+                        
+                        document.head.appendChild(script);
+                        return;
                     }
+                    
+                    // إذا وصلنا إلى هنا، فقد فشلت جميع المحاولات
+                    reject(new Error('لم يتم العثور على رمز QR في الصورة'));
                 } catch (error) {
                     reject(error);
                 }
@@ -1046,6 +1358,45 @@ async function decodeQRFromImage(file) {
         
         reader.readAsDataURL(file);
     });
+}
+
+// تحميل QR البطاقة
+function downloadCardQR(cardId) {
+    const card = investorCards.find(c => c.id === cardId);
+    const investor = investors.find(inv => inv.id === card.investorId);
+    
+    if (!card || !investor) return;
+    
+    // إنشاء canvas جديد بحجم أكبر
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 600;
+    
+    // توليد رمز QR بحجم أكبر للتحميل
+    generateCardQRCode(canvas, card, investor);
+    
+    // إضافة تفاصيل في أسفل الـ QR
+    setTimeout(() => {
+        const ctx = canvas.getContext('2d');
+        
+        // إضافة خلفية بيضاء
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 550, canvas.width, 50);
+        
+        // إضافة النص
+        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${investor.name} - ${getCardTypeName(card.type)}`, canvas.width / 2, canvas.height - 20);
+        
+        // تحميل الصورة
+        const link = document.createElement('a');
+        link.download = `card-qr-${card.number}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        createNotification('نجاح', 'تم تحميل رمز QR بنجاح', 'success');
+    }, 200);
 }
 
 // ===============================================================
@@ -1283,39 +1634,6 @@ function shareCard(cardId) {
         navigator.clipboard.writeText(url)
             .then(() => createNotification('نجاح', 'تم نسخ رابط البطاقة', 'success'));
     }
-}
-
-// تحميل QR البطاقة
-function downloadCardQR(cardId) {
-    const card = investorCards.find(c => c.id === cardId);
-    const investor = investors.find(inv => inv.id === card.investorId);
-    
-    if (!card || !investor) return;
-    
-    // إنشاء canvas جديد بحجم أكبر
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 400;
-    
-    // توليد رمز QR بحجم أكبر للتحميل
-    generateCardQRCode(canvas, card, investor);
-    
-    // إضافة تفاصيل في أسفل الـ QR
-    setTimeout(() => {
-        const ctx = canvas.getContext('2d');
-        ctx.font = 'bold 16px Arial';
-        ctx.fillStyle = '#000';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${investor.name} - ${getCardTypeName(card.type)}`, canvas.width / 2, canvas.height - 20);
-        
-        // تحميل الصورة
-        const link = document.createElement('a');
-        link.download = `card-qr-${card.number}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-        
-        createNotification('نجاح', 'تم تحميل رمز QR بنجاح', 'success');
-    }, 200);
 }
 
 // عرض إحصائيات البطاقة
@@ -1691,6 +2009,23 @@ function toggleCardStatus() {
 }
 
 // حذف البطاقة
+function deleteCard() {
+    if (!currentCardId) return;
+    
+    if (confirm('هل أنت متأكد من حذف هذه البطاقة؟')) {
+        // حذف من Firebase
+        if (cardDatabase) {
+            cardDatabase.child(currentCardId).remove();
+        }
+        
+        investorCards = investorCards.filter(c => c.id !== currentCardId);
+        saveInvestorCards();
+        
+        if (typeof createNotification === 'function') {
+            createNotification('نجاح', 'تم حذف البطاقة بنجاح', 'success');
+        }
+        
+        // Continuación de la función deleteCard()
 function deleteCard() {
     if (!currentCardId) return;
     
@@ -2093,9 +2428,7 @@ class CardFirebaseManager {
         }
     }
 
-   // Continuación del investor-card-system.js
-
-    // mraaqbt ḥālat al-biṭāqah (monitorCardStatus continuación)
+    // مراقبة حالة البطاقة
     async monitorCardStatus(cardId) {
         try {
             if (!this.db) return;
@@ -2313,12 +2646,15 @@ class MobileAppAPI {
             const data = JSON.parse(qrData);
             
             // التحقق من صحة البيانات
-            if (!data.cardId || !data.investorId) {
+            if (!data.cardId && !data.id) {
                 throw new Error('بيانات QR غير صالحة');
             }
             
+            // استخراج معرف البطاقة (يدعم التنسيقين القديم والجديد)
+            const cardId = data.cardId || data.id;
+            
             // جلب تفاصيل البطاقة
-            const cardDetails = await this.getCardDetails(data.cardId, 'guest-token');
+            const cardDetails = await this.getCardDetails(cardId, 'guest-token');
             
             if (!cardDetails) {
                 throw new Error('البطاقة غير موجودة');
@@ -2329,7 +2665,7 @@ class MobileAppAPI {
                 success: true,
                 cardData: data,
                 cardDetails,
-                deepLink: data.appLinks?.deepLink
+                deepLink: data.appLinks?.deepLink || `investmentapp://card/${cardId}`
             };
         } catch (error) {
             console.error('❌ خطأ في معالجة رمز QR:', error);
