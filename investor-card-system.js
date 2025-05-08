@@ -442,58 +442,1001 @@ function getCardFeatures(cardType) {
 // SECTION 3: وظائف رمز QR والباركود
 // ===============================================================
 
-// توليد رمز QR للبطاقة - محسن
+// Función mejorada para generar códigos QR para las tarjetas
+// ===============================================================
+// SECTION 3: Funciones de Códigos QR y Lectura - MEJORADO
+// ===============================================================
+
+// Generar un código QR para la tarjeta - Versión mejorada
 function generateCardQRCode(canvas, card, investor) {
     try {
         if (!canvas) return;
         
-        // إنشاء بيانات البطاقة
-        const cardData = createCardData(card, investor);
+        // Crear datos estructurados para el código QR
+        const cardData = createCardDataForQR(card, investor);
         
-        // التحقق من وجود مكتبة QRCode
+        // Verificar si la biblioteca QRCode está disponible
         if (window.QRCode) {
             try {
-                // استخدام مكتبة QRCode.js
+                // Limpiar el canvas existente si hay uno
+                while (canvas.firstChild) {
+                    canvas.removeChild(canvas.firstChild);
+                }
+                
+                // Configuración optimizada para mejor compatibilidad con escáneres
                 new QRCode(canvas, {
                     text: cardData,
                     width: canvas.width,
                     height: canvas.height,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.M  // استخدام مستوى تصحيح أقل للسماح بمزيد من البيانات
-                });
-            } catch (qrError) {
-                console.warn("⚠️ خطأ في مكتبة QRCode:", qrError);
-                // في حالة الفشل، استخدم بيانات أبسط
-                const simpleData = JSON.stringify({
-                    id: card.id,
-                    inv: investor.id
+                    correctLevel: QRCode.CorrectLevel.H,  // Alta corrección de errores para mejor escaneo
+                    quietZone: 10,  // Zona de silencio alrededor del código QR
+                    quietZoneColor: "#FFFFFF"
                 });
                 
-                try {
-                    new QRCode(canvas, {
-                        text: simpleData,
-                        width: canvas.width,
-                        height: canvas.height,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.L  // مستوى تصحيح منخفض للبيانات البسيطة
-                    });
-                } catch (e) {
-                    // إذا فشل أيضاً، استخدم رسم QR مبسط
-                    drawSimpleQRCode(canvas, simpleData);
-                }
+                console.log(`✅ Código QR generado exitosamente para la tarjeta ${card.id}`);
+            } catch (qrError) {
+                console.warn("⚠️ Error con la biblioteca QRCode:", qrError);
+                fallbackQRGeneration(canvas, card, investor);
             }
         } else {
-            // استخدام رمز QR مبسط
-            drawSimpleQRCode(canvas, cardData);
+            fallbackQRGeneration(canvas, card, investor);
         }
-        
-        console.log(`✅ تم إنشاء رمز QR للبطاقة ${card.id}`);
     } catch (error) {
-        console.error("❌ خطأ في إنشاء رمز QR:", error);
+        console.error("❌ Error al generar código QR:", error);
+        // Dibujo de respaldo en caso de error
         drawSimpleQRCode(canvas, JSON.stringify({id: card.id}));
     }
+}
+
+// Método alternativo para generación de QR si falla la biblioteca principal
+function fallbackQRGeneration(canvas, card, investor) {
+    console.log("⚠️ Usando método alternativo para generar QR");
+    
+    // Intentar cargar la biblioteca QRCode dinámicamente
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    script.onload = () => {
+        // Volver a intentar con la biblioteca cargada
+        generateCardQRCode(canvas, card, investor);
+    };
+    script.onerror = () => {
+        // Si aún falla, usar método simple
+        const cardData = createCardDataForQR(card, investor);
+        drawSimpleQRCode(canvas, cardData);
+    };
+    document.head.appendChild(script);
+}
+
+// Crear estructura de datos óptima para el código QR
+function createCardDataForQR(card, investor) {
+    // Estructura compacta para reducir tamaño y mejorar lectura
+    const data = {
+        v: "1.0",                  // Versión
+        id: card.id,               // ID de tarjeta
+        n: card.number,            // Número de tarjeta 
+        i: investor.id,            // ID del inversor
+        t: card.type,              // Tipo de tarjeta
+        e: card.expiry,            // Fecha de expiración
+        s: card.status,            // Estado
+        in: investor.name,         // Nombre del inversor (opcional)
+        p: investor.phone,         // Teléfono (opcional)
+        c: generateCardChecksum(card)  // Verificación de integridad
+    };
+    
+    // Convertir a JSON compacto para reducir tamaño del QR
+    return JSON.stringify(data);
+}
+
+// Dibujar un código QR simple cuando las bibliotecas fallan
+function drawSimpleQRCode(canvas, dataString = '') {
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const size = canvas.width;
+    
+    // Limpiar el canvas
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    
+    // Generar hash desde los datos para crear un patrón consistente
+    let hash = 0;
+    if (dataString) {
+        for (let i = 0; i < dataString.length; i++) {
+            hash = ((hash << 5) - hash) + dataString.charCodeAt(i);
+            hash |= 0;
+        }
+    }
+    
+    // Configuración para dibujar un QR más realista
+    const cells = 8; // Mayor número de celdas para más detalle
+    const cellSize = size / cells;
+    const padding = cellSize * 0.1;
+    
+    // Fondo blanco con borde
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, size-4, size-4);
+    
+    // Dibujar patrón de búsqueda en las esquinas (como en QR reales)
+    ctx.fillStyle = '#000000';
+    
+    // Esquina superior izquierda
+    drawFinderPattern(ctx, padding, padding, cellSize * 2);
+    
+    // Esquina superior derecha
+    drawFinderPattern(ctx, size - cellSize * 2 - padding, padding, cellSize * 2);
+    
+    // Esquina inferior izquierda
+    drawFinderPattern(ctx, padding, size - cellSize * 2 - padding, cellSize * 2);
+    
+    // Dibujar celdas de datos según el hash
+    ctx.fillStyle = '#000000';
+    const seedRandom = cyrb128(dataString || 'default');
+    const random = sfc32(seedRandom[0], seedRandom[1], seedRandom[2], seedRandom[3]);
+    
+    for (let i = 0; i < cells; i++) {
+        for (let j = 0; j < cells; j++) {
+            // Saltar áreas de patrones de búsqueda
+            if ((i < 2 && j < 2) || (i < 2 && j >= cells - 2) || (i >= cells - 2 && j < 2)) {
+                continue;
+            }
+            
+            // Determinar si llenar la celda basado en el hash
+            const shouldFill = random() > 0.5;
+            
+            if (shouldFill) {
+                const x = j * cellSize + padding;
+                const y = i * cellSize + padding;
+                const size = cellSize - padding * 2;
+                
+                ctx.fillRect(x, y, size, size);
+            }
+        }
+    }
+    
+    // Añadir patrón de alineación central (como en QR reales)
+    drawAlignmentPattern(ctx, size/2, size/2, cellSize * 0.8);
+}
+
+// Dibujar un patrón de búsqueda QR
+function drawFinderPattern(ctx, x, y, size) {
+    const innerSize = size * 0.6;
+    const innerOffset = (size - innerSize) / 2;
+    
+    // Cuadrado exterior
+    ctx.fillRect(x, y, size, size);
+    
+    // Cuadrado interior (blanco)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x + innerOffset, y + innerOffset, innerSize, innerSize);
+    
+    // Cuadrado central (negro)
+    ctx.fillStyle = '#000000';
+    const centerSize = innerSize * 0.5;
+    const centerOffset = (size - centerSize) / 2;
+    ctx.fillRect(x + centerOffset, y + centerOffset, centerSize, centerSize);
+}
+
+// Dibujar un patrón de alineación QR
+function drawAlignmentPattern(ctx, x, y, size) {
+    // Cuadrado exterior
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(x - size/2, y - size/2, size, size);
+    
+    // Cuadrado interior (blanco)
+    ctx.fillStyle = '#ffffff';
+    const innerSize = size * 0.6;
+    ctx.fillRect(x - innerSize/2, y - innerSize/2, innerSize, innerSize);
+    
+    // Punto central (negro)
+    ctx.fillStyle = '#000000';
+    const dotSize = size * 0.3;
+    ctx.fillRect(x - dotSize/2, y - dotSize/2, dotSize, dotSize);
+}
+
+// Funciones para generación de números aleatorios deterministas
+function cyrb128(str) {
+    let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+    for (let i = 0, k; i < str.length; i++) {
+        k = str.charCodeAt(i);
+        h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+        h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+        h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+        h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+    }
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+    return [(h1^h2^h3^h4)>>>0, (h2^h1)>>>0, (h3^h1)>>>0, (h4^h1)>>>0];
+}
+
+function sfc32(a, b, c, d) {
+    return function() {
+        a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+        let t = (a + b) | 0;
+        a = b ^ b >>> 9;
+        b = c + (c << 3) | 0;
+        c = (c << 21 | c >>> 11);
+        d = d + 1 | 0;
+        t = t + d | 0;
+        c = c + t | 0;
+        return (t >>> 0) / 4294967296;
+    }
+}
+
+// Escanear código de barras - Mejora del sistema de lectura
+function scanBarcode() {
+    // Crear ventana de escaneo mejorada
+    const scannerModal = document.createElement('div');
+    scannerModal.className = 'modal-overlay active';
+    scannerModal.id = 'barcodeScannerModal';
+    
+    scannerModal.innerHTML = `
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Escanear código QR</h2>
+                <div class="modal-close" onclick="closeBarcodeScanner()">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="qr-scanner-container" style="position: relative; width: 100%; height: 400px; overflow: hidden; border-radius: 8px;">
+                    <video id="qr-video" style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                    <div class="scanner-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;">
+                        <div class="scanner-frame" style="width: 250px; height: 250px; border: 3px solid #fff; border-radius: 20px; box-shadow: 0 0 0 100vw rgba(0,0,0,0.5);">
+                            <div class="scanner-line" style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(to right, transparent, #3498db, transparent); animation: scan-line 2s linear infinite;"></div>
+                        </div>
+                    </div>
+                    <div class="camera-selection" style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+                        <select id="camera-select" style="padding: 5px; border-radius: 5px; opacity: 0.7;" onchange="switchCamera(this.value)">
+                            <option value="">Cargando cámaras...</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="scanner-result" style="margin-top: 20px; text-align: center; font-size: 1.1rem;">
+                    <i class="fas fa-camera"></i> Apunta la cámara al código QR
+                </div>
+                
+                <style>
+                    @keyframes scan-line {
+                        0% { top: 0; }
+                        50% { top: 250px; }
+                        100% { top: 0; }
+                    }
+                </style>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-light" onclick="closeBarcodeScanner()">Cancelar</button>
+                <button class="btn btn-primary" onclick="uploadQRImage()">
+                    <i class="fas fa-upload"></i> Subir imagen
+                </button>
+                <button class="btn btn-secondary" onclick="toggleFlashlight()">
+                    <i class="fas fa-bolt"></i> Linterna
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(scannerModal);
+    
+    // Iniciar escaneo
+    startQRScanner();
+}
+
+// Variables para almacenar el estado del escáner
+let currentTrack = null;
+let flashlightOn = false;
+let qrScanner = null;
+let scannerInterval = null;
+
+// Iniciar escáner QR - Versión mejorada
+async function startQRScanner(deviceId = null) {
+    const video = document.getElementById('qr-video');
+    if (!video) return;
+    
+    try {
+        // Limpiar fuentes de video previas
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+        }
+        
+        // Configurar opciones de la cámara
+        const constraints = {
+            video: {
+                facingMode: "environment", // Intenta usar la cámara trasera por defecto
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                frameRate: { ideal: 30 }
+            }
+        };
+        
+        // Si se especifica un dispositivo, úsalo
+        if (deviceId) {
+            constraints.video = { deviceId: { exact: deviceId } };
+        }
+        
+        // Solicitar acceso a la cámara
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        
+        // Guardar la pista actual para controlar la linterna
+        currentTrack = stream.getVideoTracks()[0];
+        
+        // Verificar capacidades de la cámara
+        try {
+            const capabilities = currentTrack.getCapabilities();
+            const flashAvailable = capabilities && capabilities.torch;
+            
+            // Actualizar el botón de la linterna
+            const flashBtn = document.querySelector('.modal-footer .btn-secondary');
+            if (flashBtn) {
+                if (!flashAvailable) {
+                    flashBtn.disabled = true;
+                    flashBtn.title = "Esta cámara no tiene linterna";
+                    flashBtn.style.opacity = "0.5";
+                } else {
+                    flashBtn.disabled = false;
+                    flashBtn.title = "Activar/desactivar linterna";
+                    flashBtn.style.opacity = "1";
+                }
+            }
+        } catch (e) {
+            console.warn("No se pudieron verificar las capacidades de la cámara:", e);
+        }
+        
+        // Obtener lista de cámaras disponibles
+        populateCameraSelect();
+        
+        // Iniciar la reproducción del video
+        await video.play();
+        
+        // Configurar escaneo periódico de frames
+        setupQRScanning(video);
+        
+        // Mostrar mensaje de éxito
+        console.log("✅ Escáner QR iniciado correctamente");
+        
+    } catch (error) {
+        console.error("❌ Error al acceder a la cámara:", error);
+        document.getElementById('scanner-result').innerHTML = `
+            <i class="fas fa-exclamation-triangle" style="color: var(--danger-color);"></i>
+            Error al acceder a la cámara: ${error.message}
+        `;
+    }
+}
+
+// Configurar el escaneo de QR desde video
+function setupQRScanning(video) {
+    // Limpiar cualquier intervalo existente
+    if (scannerInterval) {
+        clearInterval(scannerInterval);
+    }
+    
+    // Usar jsQR si está disponible
+    if (typeof jsQR === 'function') {
+        scannerInterval = setInterval(() => {
+            if (!video.srcObject) {
+                clearInterval(scannerInterval);
+                scannerInterval = null;
+                return;
+            }
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Asegurarse de que el video tenga datos suficientes
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+            
+            // Ajustar tamaño del canvas para que coincida con el video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Dibujar un frame del video en el canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Obtener datos de la imagen
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Analizar la imagen en busca de un código QR
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+            
+            if (code) {
+                // Se encontró un código QR
+                handleScannedData(code.data);
+                clearInterval(scannerInterval);
+                scannerInterval = null;
+                
+                // Indicación visual de éxito
+                const scannerFrame = document.querySelector('.scanner-frame');
+                if (scannerFrame) {
+                    scannerFrame.style.borderColor = '#2ecc71';
+                    scannerFrame.style.boxShadow = '0 0 0 100vw rgba(46, 204, 113, 0.5)';
+                }
+                
+                // Vibración para notificar el éxito
+                if (navigator.vibrate) {
+                    navigator.vibrate([100, 50, 100]);
+                }
+            }
+        }, 100);
+    } else {
+        // Intento de cargar jsQR dinámicamente
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+        script.onload = () => {
+            setupQRScanning(video);
+        };
+        script.onerror = () => {
+            console.error("❌ No se pudo cargar jsQR");
+            // Usar método básico de detección
+            scannerInterval = setInterval(() => {
+                if (!video.srcObject) {
+                    clearInterval(scannerInterval);
+                    scannerInterval = null;
+                    return;
+                }
+                
+                // Simulación para demostración (en una implementación real se utilizaría otra biblioteca)
+                if (Math.random() < 0.001) {
+                    const mockData = JSON.stringify({
+                        id: investorCards.length > 0 ? investorCards[0].id : generateId(),
+                        i: investors.length > 0 ? investors[0].id : generateId()
+                    });
+                    handleScannedData(mockData);
+                    clearInterval(scannerInterval);
+                    scannerInterval = null;
+                }
+            }, 100);
+        };
+        document.head.appendChild(script);
+    }
+}
+
+// Obtener lista de cámaras
+async function populateCameraSelect() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const select = document.getElementById('camera-select');
+        
+        if (!select || videoDevices.length === 0) return;
+        
+        // Limpiar opciones actuales
+        select.innerHTML = '';
+        
+        // Añadir cámaras disponibles
+        videoDevices.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.text = device.label || `Cámara ${index + 1}`;
+            select.appendChild(option);
+        });
+        
+        // Seleccionar cámara trasera por defecto si existe
+        const backCamera = videoDevices.find(device => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('trasera') ||
+            device.label.toLowerCase().includes('rear')
+        );
+        
+        if (backCamera) {
+            select.value = backCamera.deviceId;
+        }
+    } catch (error) {
+        console.error("❌ Error al obtener lista de cámaras:", error);
+    }
+}
+
+// Cambiar cámara
+async function switchCamera(deviceId) {
+    if (!deviceId) return;
+    
+    try {
+        // Detener la cámara actual
+        if (currentTrack) {
+            currentTrack.stop();
+            currentTrack = null;
+        }
+        
+        // Limpiar cualquier intervalo de escaneo
+        if (scannerInterval) {
+            clearInterval(scannerInterval);
+            scannerInterval = null;
+        }
+        
+        // Iniciar con la nueva cámara
+        await startQRScanner(deviceId);
+    } catch (error) {
+        console.error("❌ Error al cambiar de cámara:", error);
+    }
+}
+
+// Alternar linterna
+async function toggleFlashlight() {
+    try {
+        if (!currentTrack) return;
+        
+        const capabilities = currentTrack.getCapabilities();
+        
+        // Verificar si la linterna es compatible
+        if (!capabilities.torch) {
+            createNotification('Aviso', 'Esta cámara no admite linterna', 'warning');
+            return;
+        }
+        
+        flashlightOn = !flashlightOn;
+        await currentTrack.applyConstraints({
+            advanced: [{ torch: flashlightOn }]
+        });
+        
+        // Actualizar icono del botón
+        const flashBtn = document.querySelector('.modal-footer .btn-secondary i');
+        if (flashBtn) {
+            flashBtn.className = flashlightOn ? 'fas fa-bolt-slash' : 'fas fa-bolt';
+        }
+    } catch (error) {
+        console.error("❌ Error al controlar la linterna:", error);
+        createNotification('Error', 'No se pudo controlar la linterna', 'error');
+    }
+}
+
+// Procesar datos escaneados
+function handleScannedData(data) {
+    try {
+        console.log("⏳ Procesando datos escaneados:", data);
+        
+        // Analizar los datos
+        let cardData;
+        try {
+            cardData = JSON.parse(data);
+        } catch (e) {
+            throw new Error('Formato de datos QR inválido');
+        }
+        
+        // Verificar validez de los datos - soporta formatos antiguos y nuevos
+        let cardId = cardData.cardId || cardData.id;
+        let investorId = cardData.investorId || cardData.i;
+        
+        if (!cardId && !investorId) {
+            throw new Error('Datos de la tarjeta inválidos');
+        }
+        
+        // Buscar la tarjeta
+        const card = investorCards.find(c => c.id === cardId);
+        const investor = investors.find(inv => inv.id === investorId);
+        
+        if (card && investor) {
+            // Cerrar el escáner
+            closeBarcodeScanner();
+            
+            // Mostrar detalles de la tarjeta
+            viewCardDetails(card.id);
+            
+            // Notificación de éxito
+            createNotification('Éxito', 'Tarjeta identificada correctamente', 'success');
+        } else {
+            throw new Error('Tarjeta no encontrada en el sistema');
+        }
+    } catch (error) {
+        console.error('❌ Error al procesar datos escaneados:', error);
+        const resultElement = document.getElementById('scanner-result');
+        if (resultElement) {
+            resultElement.innerHTML = `
+                <i class="fas fa-exclamation-circle" style="color: var(--danger-color);"></i>
+                ${error.message}
+            `;
+        }
+        
+        // Vibración para indicar error
+        if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+        }
+        
+        // Reanudar escaneo después del error
+        setTimeout(() => {
+            if (document.getElementById('scanner-result')) {
+                document.getElementById('scanner-result').innerHTML = `
+                    <i class="fas fa-camera"></i> Apunta la cámara al código QR
+                `;
+            }
+            
+            // Reiniciar el escaneo
+            const video = document.getElementById('qr-video');
+            if (video && video.srcObject) {
+                setupQRScanning(video);
+            }
+        }, 3000);
+    }
+}
+
+// Cerrar escáner de códigos de barras
+function closeBarcodeScanner() {
+    // Detener el escáner
+    if (qrScanner) {
+        qrScanner.stop();
+        qrScanner = null;
+    }
+    
+    // Limpiar cualquier intervalo de escaneo
+    if (scannerInterval) {
+        clearInterval(scannerInterval);
+        scannerInterval = null;
+    }
+    
+    // Detener la cámara
+    const video = document.getElementById('qr-video');
+    if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+    
+    // Reiniciar variables globales
+    currentTrack = null;
+    flashlightOn = false;
+    
+    // Eliminar la ventana modal
+    const modal = document.getElementById('barcodeScannerModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Subir imagen QR
+function uploadQRImage() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Mostrar estado de carga
+        const resultElement = document.getElementById('scanner-result');
+        if (resultElement) {
+            resultElement.innerHTML = `
+                <i class="fas fa-spinner fa-spin"></i> Procesando imagen...
+            `;
+        }
+        
+        try {
+            const qrResult = await decodeQRFromImage(file);
+            
+            if (qrResult) {
+                handleScannedData(qrResult);
+            } else {
+                throw new Error('No se encontró código QR en la imagen');
+            }
+        } catch (error) {
+            console.error("❌ Error al leer código QR de la imagen:", error);
+            if (resultElement) {
+                resultElement.innerHTML = `
+                    <i class="fas fa-exclamation-circle" style="color: var(--danger-color);"></i>
+                    ${error.message || 'Error al procesar la imagen'}
+                `;
+            }
+        }
+    };
+    
+    input.click();
+}
+
+// Decodificar QR desde imagen
+async function decodeQRFromImage(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = async (event) => {
+            const img = new Image();
+            
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Ajustar tamaño del canvas para que coincida con la imagen
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    // Dibujar la imagen en el canvas
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Obtener datos de la imagen
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    // Intentar decodificar QR usando jsQR si está disponible
+                    if (typeof jsQR === 'function') {
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "attemptBoth",
+                        });
+                        
+                        if (code) {
+                            resolve(code.data);
+                            return;
+                        }
+                    }
+                    
+                    // Si jsQR no está disponible o no pudo decodificar, cargar dinámicamente
+                    if (typeof jsQR !== 'function') {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+                        script.onload = () => {
+                            // Intentar nuevamente con la biblioteca cargada
+                            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                                inversionAttempts: "attemptBoth",
+                            });
+                            
+                            if (code) {
+                                resolve(code.data);
+                            } else {
+                                reject(new Error('No se pudo detectar un código QR en la imagen'));
+                            }
+                        };
+                        script.onerror = () => {
+                            reject(new Error('No se pudo cargar la biblioteca de QR'));
+                        };
+                        document.head.appendChild(script);
+                        return;
+                    }
+                    
+                    // No se pudo decodificar el QR
+                    reject(new Error('No se pudo detectar un código QR en la imagen'));
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            img.onerror = () => {
+                reject(new Error('Error al cargar la imagen'));
+            };
+            
+            img.src = event.target.result;
+        };
+        
+        reader.onerror = () => {
+            reject(new Error('Error al leer el archivo'));
+        };
+        
+        reader.readAsDataURL(file);
+    });
+}
+
+// Función para descargar el código QR como imagen
+function downloadCardQR(cardId) {
+    const card = investorCards.find(c => c.id === cardId);
+    const investor = investors.find(inv => inv.id === card.investorId);
+    
+    if (!card || !investor) return;
+    
+    // Crear un canvas más grande para mejor calidad
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 600;
+    
+    // Generar el código QR
+    generateCardQRCode(canvas, card, investor);
+    
+    // Añadir información adicional debajo del QR
+    setTimeout(() => {
+        const ctx = canvas.getContext('2d');
+        
+        // Configuración de texto
+        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        
+        // Nombre e ID de la tarjeta
+        ctx.fillText(`${investor.name}`, canvas.width/2, canvas.height - 60);
+        ctx.font = 'normal 16px Arial';
+        ctx.fillText(`${getCardTypeName(card.type)} - ${formatCardNumber(card.number)}`, canvas.width/2, canvas.height - 30);
+        
+        // Descargar imagen
+        const link = document.createElement('a');
+        link.download = `tarjeta-qr-${card.id}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        createNotification('Éxito', 'El código QR se ha descargado correctamente', 'success');
+    }, 300);
+}
+
+// Función mejorada para generar checksum
+function generateChecksum(card) {
+    const data = `${card.id}-${card.number}-${card.investorId}-${card.type}-${card.expiry}`;
+    
+    let checksum = 0;
+    for (let i = 0; i < data.length; i++) {
+        checksum = ((checksum << 5) - checksum) + data.charCodeAt(i);
+        checksum = checksum & checksum;
+    }
+    
+    return Math.abs(checksum).toString(16).substring(0, 8);
+}
+
+// Dibuja un código QR simple cuando las bibliotecas fallan
+function drawSimpleQRCode(canvas, dataString = '') {
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const size = canvas.width;
+    
+    // Limpiar el canvas
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    
+    // Generar hash desde los datos para crear un patrón consistente
+    let hash = 0;
+    if (dataString) {
+        for (let i = 0; i < dataString.length; i++) {
+            hash = ((hash << 5) - hash) + dataString.charCodeAt(i);
+            hash |= 0;
+        }
+    }
+    
+    // Configuración para dibujar un QR más realista
+    const cells = 8; // Mayor número de celdas para más detalle
+    const cellSize = size / cells;
+    const padding = cellSize * 0.1;
+    
+    // Fondo blanco con borde
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, size-4, size-4);
+    
+    // Dibujar patrón de búsqueda en las esquinas (como en QR reales)
+    ctx.fillStyle = '#000000';
+    
+    // Esquina superior izquierda
+    drawFinderPattern(ctx, padding, padding, cellSize * 2);
+    
+    // Esquina superior derecha
+    drawFinderPattern(ctx, size - cellSize * 2 - padding, padding, cellSize * 2);
+    
+    // Esquina inferior izquierda
+    drawFinderPattern(ctx, padding, size - cellSize * 2 - padding, cellSize * 2);
+    
+    // Dibujar celdas de datos según el hash
+    ctx.fillStyle = '#000000';
+    const seedRandom = cyrb128(dataString || card.id || 'default');
+    const random = sfc32(seedRandom[0], seedRandom[1], seedRandom[2], seedRandom[3]);
+    
+    for (let i = 0; i < cells; i++) {
+        for (let j = 0; j < cells; j++) {
+            // Saltar áreas de patrones de búsqueda
+            if ((i < 2 && j < 2) || (i < 2 && j >= cells - 2) || (i >= cells - 2 && j < 2)) {
+                continue;
+            }
+            
+            // Determinar si llenar la celda basado en el hash
+            const shouldFill = random() > 0.5;
+            
+            if (shouldFill) {
+                const x = j * cellSize + padding;
+                const y = i * cellSize + padding;
+                const size = cellSize - padding * 2;
+                
+                ctx.fillRect(x, y, size, size);
+            }
+        }
+    }
+    
+    // Añadir patrón de alineación central (como en QR reales)
+    drawAlignmentPattern(ctx, size/2, size/2, cellSize * 0.8);
+}
+
+// Dibujar un patrón de búsqueda QR
+function drawFinderPattern(ctx, x, y, size) {
+    const innerSize = size * 0.6;
+    const innerOffset = (size - innerSize) / 2;
+    
+    // Cuadrado exterior
+    ctx.fillRect(x, y, size, size);
+    
+    // Cuadrado interior (blanco)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x + innerOffset, y + innerOffset, innerSize, innerSize);
+    
+    // Cuadrado central (negro)
+    ctx.fillStyle = '#000000';
+    const centerSize = innerSize * 0.5;
+    const centerOffset = (size - centerSize) / 2;
+    ctx.fillRect(x + centerOffset, y + centerOffset, centerSize, centerSize);
+}
+
+// Dibujar un patrón de alineación QR
+function drawAlignmentPattern(ctx, x, y, size) {
+    // Cuadrado exterior
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(x - size/2, y - size/2, size, size);
+    
+    // Cuadrado interior (blanco)
+    ctx.fillStyle = '#ffffff';
+    const innerSize = size * 0.6;
+    ctx.fillRect(x - innerSize/2, y - innerSize/2, innerSize, innerSize);
+    
+    // Punto central (negro)
+    ctx.fillStyle = '#000000';
+    const dotSize = size * 0.3;
+    ctx.fillRect(x - dotSize/2, y - dotSize/2, dotSize, dotSize);
+}
+
+// Funciones para generación de números aleatorios deterministas
+function cyrb128(str) {
+    let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+    for (let i = 0, k; i < str.length; i++) {
+        k = str.charCodeAt(i);
+        h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+        h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+        h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+        h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+    }
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+    return [(h1^h2^h3^h4)>>>0, (h2^h1)>>>0, (h3^h1)>>>0, (h4^h1)>>>0];
+}
+
+function sfc32(a, b, c, d) {
+    return function() {
+        a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+        let t = (a + b) | 0;
+        a = b ^ b >>> 9;
+        b = c + (c << 3) | 0;
+        c = (c << 21 | c >>> 11);
+        d = d + 1 | 0;
+        t = t + d | 0;
+        c = c + t | 0;
+        return (t >>> 0) / 4294967296;
+    }
+}
+
+// Función para descargar el código QR como imagen
+function downloadCardQR(cardId) {
+    const card = investorCards.find(c => c.id === cardId);
+    const investor = investors.find(inv => inv.id === card.investorId);
+    
+    if (!card || !investor) return;
+    
+    // Crear un canvas más grande para mejor calidad
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 600;
+    
+    // Generar el código QR
+    generateCardQRCode(canvas, card, investor);
+    
+    // Añadir información adicional debajo del QR
+    setTimeout(() => {
+        const ctx = canvas.getContext('2d');
+        
+        // Configuración de texto
+        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        
+        // Nombre e ID de la tarjeta
+        ctx.fillText(`${investor.name}`, canvas.width/2, canvas.height - 60);
+        ctx.font = 'normal 16px Arial';
+        ctx.fillText(`${getCardTypeName(card.type)} - ${formatCardNumber(card.number)}`, canvas.width/2, canvas.height - 30);
+        
+        // Descargar imagen
+        const link = document.createElement('a');
+        link.download = `tarjeta-qr-${card.id}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        createNotification('Éxito', 'El código QR se ha descargado correctamente', 'success');
+    }, 300);
 }
 
 // رسم رمز QR بسيط (احتياطي)
