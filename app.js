@@ -1,5 +1,6 @@
 // Global Variables
 let investors = [];
+let investorCardSystem = null;
 let investments = [];
 let operations = [];
 let events = [];

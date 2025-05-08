@@ -2077,3 +2077,36 @@ body {
 .login-tab.active {
     display: block;
 }
+
+/* تعديلات للتوافق مع ثيم التطبيق */
+#investor-cards-page {
+    background-color: var(--background-color, #f5f6fa);
+}
+
+.card-content-area {
+    background-color: var(--card-background, #ffffff);
+    border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.card-form-container {
+    background-color: var(--card-background, #ffffff);
+    border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.investor-details {
+    background-color: var(--card-background, #ffffff);
+    border: 1px solid var(--border-color, #e0e0e0);
+}
+
+/* دعم الوضع الداكن */
+body.dark-mode #investor-cards-page {
+    background-color: var(--dark-background, #1a1a2e);
+}
+
+body.dark-mode .card-content-area,
+body.dark-mode .card-form-container,
+body.dark-mode .investor-details {
+    background-color: var(--dark-card-background, #252538);
+    border-color: var(--dark-border-color, #3a3a5c);
+    color: var(--dark-text-color, #e0e0e0);
+}
