@@ -1,3 +1,4 @@
+
 // نظام بطاقة المستثمر الإلكترونية
 // يتيح هذا النظام إنشاء وإدارة بطاقات ماستر افتراضية للمستثمرين
 // تحتوي على جميع معلوماتهم ومعاملاتهم مع رمز QR للوصول السريع
@@ -7,6 +8,9 @@
 
 // المتغيرات العامة
 let investorCards = {}; // كائن لتخزين جميع البطاقات المنشأة
+let syncActive = false; // حالة المزامنة
+let currentUser = null; // المستخدم الحالي
+
 let cardSettings = {
     cardColor: "#3498db", // اللون الافتراضي للبطاقة
     logoUrl: "", // شعار الشركة
@@ -56,47 +60,78 @@ function loadInvestorCards() {
 function saveInvestorCards() {
     localStorage.setItem('investorCards', JSON.stringify(investorCards));
     
-    // مزامنة مع Firebase إذا كانت المزامنة مفعلة
-    if (syncActive && cardSettings.enableRealTimeUpdates) {
+    // مزامنة مع Firebase إذا كانت المزامنة مفعلة والمستخدم مسجل دخول
+    if (window.syncActive && window.currentUser && cardSettings.enableRealTimeUpdates) {
         syncCardsToFirebase();
     }
 }
 
 // إعداد مزامنة البطاقات مع Firebase
 function setupFirebaseCardsSync() {
-    if (!window.firebaseApp || !window.firebaseApp.database) {
+    if (!window.firebaseApp || !window.firebaseApp.database || typeof firebase === 'undefined') {
         console.warn("Firebase غير متاح للمزامنة");
         return;
     }
     
-    // الاستماع للتغييرات في بطاقات المستثمرين
-    window.firebaseApp.database().ref('investorCards').on('value', (snapshot) => {
-        const firebaseCards = snapshot.val() || {};
+    if (!window.currentUser) {
+        console.warn("المستخدم غير مسجل دخول");
+        return;
+    }
+    
+    try {
+        // استخدام كائن firebase مباشرة
+        const database = firebase.database();
+        const userId = window.currentUser.uid;
         
-        // دمج البطاقات الجديدة مع البطاقات المحلية
-        for (const cardId in firebaseCards) {
-            if (!investorCards[cardId] || firebaseCards[cardId].updatedAt > investorCards[cardId].updatedAt) {
-                investorCards[cardId] = firebaseCards[cardId];
+        // الاستماع للتغييرات في بطاقات المستثمرين
+        database.ref(`users/${userId}/investorCards`).on('value', (snapshot) => {
+            const firebaseCards = snapshot.val() || {};
+            
+            // دمج البطاقات الجديدة مع البطاقات المحلية
+            for (const cardId in firebaseCards) {
+                if (!investorCards[cardId] || firebaseCards[cardId].updatedAt > investorCards[cardId].updatedAt) {
+                    investorCards[cardId] = firebaseCards[cardId];
+                }
             }
-        }
-        
-        // حفظ البطاقات محلياً
-        localStorage.setItem('investorCards', JSON.stringify(investorCards));
-        
-        // تحديث واجهة المستخدم
-        updateInvestorCardsUI();
-    });
+            
+            // حفظ البطاقات محلياً
+            localStorage.setItem('investorCards', JSON.stringify(investorCards));
+            
+            // تحديث واجهة المستخدم
+            updateInvestorCardsUI();
+        });
+    } catch (error) {
+        console.error('خطأ في إعداد مزامنة البطاقات:', error);
+    }
 }
-
 // مزامنة البطاقات مع Firebase
 function syncCardsToFirebase() {
-    if (!window.firebaseApp || !window.firebaseApp.database) {
+    if (!window.firebaseApp || !window.firebaseApp.database || typeof firebase === 'undefined') {
         console.warn("Firebase غير متاح للمزامنة");
         return;
     }
     
-    // تحديث البطاقات في Firebase
-    window.firebaseApp.database().ref('investorCards').set(investorCards);
+    if (!window.currentUser) {
+        console.warn("المستخدم غير مسجل دخول");
+        return;
+    }
+    
+    try {
+        // استخدام كائن firebase مباشرة
+        const database = firebase.database();
+        const userId = window.currentUser.uid;
+        
+        // تحديث البطاقات في Firebase
+        database.ref(`users/${userId}/investorCards`).set(investorCards)
+            .then(() => {
+                console.log('تمت مزامنة البطاقات مع Firebase');
+            })
+            .catch((error) => {
+                console.error('خطأ في مزامنة البطاقات:', error);
+            });
+    } catch (error) {
+        console.error('خطأ في مزامنة البطاقات:', error);
+    }
 }
 
 // إضافة زر إنشاء البطاقة في صفحة المستثمرين
@@ -1704,20 +1739,47 @@ function printAllCards() {
 
 // مزامنة بطاقات المستثمرين مع Firebase
 function syncInvestorCardsWithFirebase() {
-    if (!syncActive) {
+    // التحقق من حالة تسجيل الدخول أولاً
+    if (!window.currentUser) {
+        createNotification('تنبيه', 'يجب تسجيل الدخول أولاً للمزامنة', 'warning');
+        // فتح نافذة تسجيل الدخول
+        if (window.firebaseApp && window.firebaseApp.showLoginDialog) {
+            window.firebaseApp.showLoginDialog();
+        }
+        return;
+    }
+    
+    // التحقق من تفعيل المزامنة
+    if (!window.syncActive) {
         createNotification('تنبيه', 'المزامنة غير مفعلة. يرجى تفعيل المزامنة أولاً.', 'warning');
         return;
     }
     
-    if (!window.firebaseApp || !window.firebaseApp.database) {
-        createNotification('خطأ', 'Firebase غير متاح للمزامنة', 'danger');
+    // التحقق من توفر Firebase
+    if (!window.firebaseApp || !window.firebaseApp.database || typeof firebase === 'undefined') {
+        createNotification('خطأ', 'Firebase غير متاح للمزامنة. يرجى التأكد من تهيئة Firebase بشكل صحيح.', 'danger');
         return;
     }
     
-    // مزامنة البطاقات
-    window.firebaseApp.database().ref('investorCards').set(investorCards);
-    
-    createNotification('نجاح', 'تمت مزامنة بطاقات المستثمرين مع Firebase بنجاح', 'success');
+    try {
+        // استخدام كائن firebase مباشرة
+        const database = firebase.database();
+        const userId = window.currentUser.uid;
+        
+        // مزامنة البطاقات
+        database.ref(`users/${userId}/investorCards`).set(investorCards)
+            .then(() => {
+                createNotification('نجاح', 'تمت مزامنة بطاقات المستثمرين مع Firebase بنجاح', 'success');
+            })
+            .catch((error) => {
+                console.error('خطأ في المزامنة:', error);
+                createNotification('خطأ', 'حدث خطأ أثناء المزامنة: ' + error.message, 'danger');
+            });
+            
+    } catch (error) {
+        console.error('خطأ في المزامنة:', error);
+        createNotification('خطأ', 'حدث خطأ أثناء المزامنة: ' + error.message, 'danger');
+    }
 }
 
 // تحديث جميع البطاقات
