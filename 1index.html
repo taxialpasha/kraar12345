@@ -3,2279 +3,1576 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام إدارة الاستثمار المتطور</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-
-    <link href="style.css" rel="stylesheet" />
-
+    <title>قارئ بطاقات المستثمرين</title>
     <style>
+        /* الأنماط العامة */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --gray-color: #95a5a6;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            direction: rtl;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--dark-color);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        /* أنماط قسم القراءة */
+        .card-reader {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .reader-options {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .option-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .option-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .option-btn.camera {
+            background-color: var(--secondary-color);
+        }
+        
+        .option-btn i {
+            font-size: 20px;
+        }
+        
+        /* أنماط قارئ الكاميرا */
+        .camera-reader {
+            display: none;
+            position: relative;
+            width: 100%;
+            height: 350px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .camera-reader.active {
+            display: block;
+        }
+        
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+        
+        .scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .scanner-frame {
+            width: 250px;
+            height: 250px;
+            border: 3px solid #fff;
+            border-radius: 20px;
+            box-shadow: 0 0 0 100vw rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        
+        .scanner-line {
+            position: absolute;
+            top: 0;
+            left: 10px;
+            right: 10px;
+            height: 2px;
+            background-color: var(--primary-color);
+            box-shadow: 0 0 8px var(--primary-color);
+            animation: scan 2s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { top: 10px; }
+            50% { top: calc(100% - 10px); }
+            100% { top: 10px; }
+        }
+        
+        /* أنماط محمل الملفات */
+        .file-uploader {
+            display: none;
+            border: 2px dashed var(--gray-color);
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .file-uploader.active {
+            display: block;
+        }
+        
+        .file-uploader.drag-over {
+            border-color: var(--primary-color);
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        .file-uploader i {
+            font-size: 48px;
+            color: var(--gray-color);
+            margin-bottom: 15px;
+        }
+        
+        .file-uploader p {
+            margin: 10px 0;
+            color: var(--dark-color);
+            font-size: 16px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        /* أنماط عرض النتائج */
+        .results {
+            display: none;
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .results.active {
+            display: block;
+        }
+        
+        .card-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .investor-card {
+            width: 350px;
+            height: 220px;
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            margin: 0 auto;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .investor-card.premium {
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+        }
+        
+        .investor-card.gold {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+        
+        .investor-card.platinum {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+        }
+        
+        .card-shimmer {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            50% { left: 100%; }
+            100% { left: 100%; }
+        }
+        
+        .card-content {
+            position: relative;
+            height: 100%;
+            padding: 20px;
+            color: white;
+            z-index: 1;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        
+        .card-logo {
+            width: 60px;
+            height: 35px;
+            background: white;
+            border-radius: 5px;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .card-chip-container {
+            position: absolute;
+            top: 60px;
+            left: 30px;
+        }
+        
+        .card-chip {
+            width: 50px;
+            height: 40px;
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chip-lines {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 35px;
+            height: 25px;
+            border: 2px solid rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        
+        .card-type-icon {
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .card-qr-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 5px;
+            border-radius: 8px;
+            width: 80px;
+            height: 80px;
+        }
+        
+        .card-nfc-indicator {
+            position: absolute;
+            top: 50%;
+            right: 30px;
+            transform: translateY(-50%) rotate(90deg);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 20px;
+        }
+        
+        .card-number {
+            font-size: 20px;
+            letter-spacing: 3px;
+            margin-top: 60px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            font-family: 'Courier New', monospace;
+        }
+        
+        .card-details {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .card-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+        
+        .card-value {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+        
+        .card-footer {
+            position: absolute;
+            bottom: 10px;
+            right: 20px;
+            text-align: right;
+        }
+        
+        .card-bank-name {
+            font-size: 10px;
+            opacity: 0.6;
+        }
+        
+        .card-type-name {
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+        
+        .card-details-container {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .card-details-container h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--dark-color);
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .info-item {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .info-item label {
+            display: block;
+            font-size: 14px;
+            color: var(--gray-color);
+            margin-bottom: 5px;
+        }
+        
+        .info-item div {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+        
+        /* أنماط الرسائل */
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .message.success {
+            background-color: rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+        }
+        
+        .message.error {
+            background-color: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+        
+        .message.warning {
+            background-color: rgba(243, 156, 18, 0.2);
+            color: #f39c12;
+        }
+        
+        .message.info {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+        
+        .message i {
+            font-size: 20px;
+        }
+        
+        /* أنماط الإشعارات */
+        #notifications-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 300px;
+        }
+        
+        .notification {
+            background-color: white;
+            border-right: 4px solid;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            border-color: var(--secondary-color);
+        }
+        
+        .notification.error {
+            border-color: var(--danger-color);
+        }
+        
+        .notification.warning {
+            border-color: var(--warning-color);
+        }
+        
+        .notification.info {
+            border-color: var(--primary-color);
+        }
+        
+        .notification h4 {
+            margin: 0 0 5px;
+            font-size: 16px;
+        }
+        
+        .notification p {
+            margin: 0;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .notification-progress {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            height: 3px;
+            width: 100%;
+            transition: width 5s linear;
+        }
+        
+        .notification.success .notification-progress {
+            background-color: var(--secondary-color);
+        }
+        
+        .notification.error .notification-progress {
+            background-color: var(--danger-color);
+        }
+        
+        .notification.warning .notification-progress {
+            background-color: var(--warning-color);
+        }
+        
+        .notification.info .notification-progress {
+            background-color: var(--primary-color);
+        }
+        
+        /* أنماط محمل */
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
 
+        /* أنماط أخرى */
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-light {
+            background-color: var(--light-color);
+            color: var(--dark-color);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
 
+        /* التوافق مع الأجهزة المحمولة */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            header {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            .card-reader, .results {
+                padding: 15px;
+            }
+            
+            .investor-card {
+                width: 300px;
+                height: 190px;
+            }
+            
+            .card-number {
+                font-size: 16px;
+                margin-top: 50px;
+            }
+            
+            .card-chip {
+                width: 40px;
+                height: 32px;
+            }
+            
+            .card-qr-container {
+                width: 60px;
+                height: 60px;
+            }
+        }
     </style>
+    <!-- إضافة الخطوط والأيقونات -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fas fa-chart-line"></i>
+    <div class="container">
+        <header>
+            <h1>قارئ بطاقات المستثمرين</h1>
+            <p>قم بمسح رمز QR أو تحميل صورة للبطاقة للتعرف عليها</p>
+        </header>
+        
+        <div class="card-reader">
+            <div class="reader-options">
+                <button class="option-btn camera" onclick="startCamera()">
+                    <i class="fas fa-camera"></i>
+                    استخدم الكاميرا
+                </button>
+                <button class="option-btn" onclick="showFileUploader()">
+                    <i class="fas fa-upload"></i>
+                    تحميل صورة
+                </button>
+            </div>
+            
+            <div id="cameraReader" class="camera-reader">
+                <video id="video" playsinline autoplay></video>
+                <div class="scanner-overlay">
+                    <div class="scanner-frame">
+                        <div class="scanner-line"></div>
                     </div>
-                    <div class="logo-text">نظام الاستثمار</div>
+                </div>
+                <div id="cameraControls" style="position: absolute; bottom: 10px; left: 10px; display: flex; gap: 10px;">
+                    <button class="btn btn-light" onclick="switchCamera()" style="padding: 8px; border-radius: 50%;">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button class="btn btn-light" onclick="toggleFlash()" style="padding: 8px; border-radius: 50%;">
+                        <i class="fas fa-bolt"></i>
+                    </button>
                 </div>
             </div>
-            <div class="sidebar-menu">
-                <div class="menu-category">لوحة التحكم</div>
-                <a href="#dashboard" class="menu-item active" onclick="showPage('dashboard')">
-                    <span class="menu-icon"><i class="fas fa-tachometer-alt"></i></span>
-                    <span>الرئيسية</span>
-                </a>
-                <a href="#analytics" class="menu-item" onclick="showPage('analytics')">
-                    <span class="menu-icon"><i class="fas fa-chart-bar"></i></span>
-                    <span>التحليلات</span>
-                </a>
-
-                <div class="menu-category">إدارة الاستثمار</div>
-                <a href="#investors" class="menu-item" onclick="showPage('investors')">
-                    <span class="menu-icon"><i class="fas fa-users"></i></span>
-                    <span>المستثمرين</span>
-                </a>
-                <a href="#investments" class="menu-item" onclick="showPage('investments')">
-                    <span class="menu-icon"><i class="fas fa-money-bill-wave"></i></span>
-                    <span>الاستثمارات</span>
-                </a>
-                <a href="#profits" class="menu-item" onclick="showPage('profits')">
-                    <span class="menu-icon"><i class="fas fa-hand-holding-usd"></i></span>
-                    <span>الأرباح</span>
-                </a>
-                <a href="#operations" class="menu-item" onclick="showPage('operations')">
-                    <span class="menu-icon"><i class="fas fa-exchange-alt"></i></span>
-                    <span>العمليات</span>
-                    <span class="menu-badge" id="operationsBadge">3</span>
-                </a>
-
-                <div class="menu-category">التقارير</div>
-                <a href="#reports" class="menu-item" onclick="showPage('reports')">
-                    <span class="menu-icon"><i class="fas fa-file-alt"></i></span>
-                    <span>التقارير</span>
-                </a>
-                <a href="#financial" class="menu-item" onclick="showPage('financial')">
-                    <span class="menu-icon"><i class="fas fa-file-invoice-dollar"></i></span>
-                    <span>التقارير المالية</span>
-                </a>
-
-                <div class="menu-category">النظام</div>
-                <a href="#calendar" class="menu-item" onclick="showPage('calendar')">
-                    <span class="menu-icon"><i class="fas fa-calendar-alt"></i></span>
-                    <span>التقويم</span>
-                </a>
-                <a href="#notifications" class="menu-item" onclick="toggleNotificationPanel()">
-                    <span class="menu-icon"><i class="fas fa-bell"></i></span>
-                    <span>الإشعارات</span>
-                    <span class="menu-badge" id="notificationBadge">5</span>
-                </a>
-                <a href="#settings" class="menu-item" onclick="showPage('settings')">
-                    <span class="menu-icon"><i class="fas fa-cog"></i></span>
-                    <span>الإعدادات</span>
-                </a>
-            </div>
-            <div class="sidebar-footer">
-                <div class="sidebar-user">
-                    <div class="user-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>
-                    <div class="user-info">
-                        <div class="user-name">المدير</div>
-                        <div class="user-role">مسؤول النظام</div>
-                    </div>
-                </div>
-                <div class="logout-btn" onclick="logout()">
-                    <i class="fas fa-sign-out-alt"></i>
-                </div>
+            
+            <div id="fileUploader" class="file-uploader">
+                <i class="fas fa-file-image"></i>
+                <p>اسحب وأفلت صورة رمز QR هنا</p>
+                <p>أو</p>
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">اختر ملفاً</button>
+                <input type="file" id="fileInput" class="file-input" accept="image/*" onchange="handleFileSelect(this.files)">
             </div>
         </div>
-
-        <!-- Content Area -->
-        <div class="content">
-            <!-- Dashboard Page -->
-            <div id="dashboard" class="page active">
-                <div class="header">
-                    <h1 class="page-title">لوحة التحكم</h1>
-                    <div class="header-actions">
-                        <div class="search-bar">
-                            <input type="text" class="search-input" placeholder="بحث...">
-                            <i class="fas fa-search search-icon"></i>
-                        </div>
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="alert alert-info">
-                    <div class="alert-icon">
-                        <i class="fas fa-info"></i>
-                    </div>
-                    <div class="alert-content">
-                        <div class="alert-title">مرحباً بك في النظام</div>
-                        <div class="alert-text">يوجد هناك 3 عمليات جديدة تحتاج للمراجعة، و5 إشعارات جديدة.</div>
-                    </div>
-                </div>
-
-                <div class="dashboard-cards">
-                    <div class="card">
-                        <div class="card-bg primary">
-                            <i class="fas fa-users fa-4x"></i>
-                        </div>
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">إجمالي المستثمرين</div>
-                                <div class="card-value" id="totalInvestors">24</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>15% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon primary">
-                                <i class="fas fa-users"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-bg success">
-                            <i class="fas fa-money-bill-wave fa-4x"></i>
-                        </div>
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">إجمالي الاستثمارات</div>
-                                <div class="card-value" id="totalInvestments">245,000,000 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>8% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon success">
-                                <i class="fas fa-money-bill-wave"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-bg warning">
-                            <i class="fas fa-hand-holding-usd fa-4x"></i>
-                        </div>
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">إجمالي الأرباح</div>
-                                <div class="card-value" id="totalProfits">4,287,500 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>12% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon warning">
-                                <i class="fas fa-hand-holding-usd"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-bg info">
-                            <i class="fas fa-exchange-alt fa-4x"></i>
-                        </div>
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">عدد المعاملات</div>
-                                <div class="card-value" id="totalTransactions">68</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>5% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon info">
-                                <i class="fas fa-exchange-alt"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid-layout">
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <div class="chart-title">تحليل الاستثمارات والأرباح</div>
-                            <div class="chart-actions">
-                                <button class="btn btn-sm btn-light">اليومي</button>
-                                <button class="btn btn-sm btn-primary">الشهري</button>
-                                <button class="btn btn-sm btn-light">السنوي</button>
-                            </div>
-                        </div>
-                        <div id="investmentChart" style="height: 300px; width: 100%;">
-                            <!-- Chart will be rendered here -->
-                            <div style="height: 300px; width: 100%; display: flex; align-items: center; justify-content: center;">
-                                <div style="text-align: center; color: var(--gray-600);">
-                                    <i class="fas fa-chart-line fa-3x" style="margin-bottom: 10px;"></i>
-                                    <p>سيتم عرض الرسم البياني هنا</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="table-container">
-                        <div class="table-header">
-                            <div class="table-title">أحدث المستثمرين</div>
-                            <button class="btn btn-sm btn-primary" onclick="showPage('investors')">عرض الكل</button>
-                        </div>
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>المستثمر</th>
-                                    <th>المبلغ</th>
-                                    <th>التاريخ</th>
-                                </tr>
-                            </thead>
-                            <tbody id="recentInvestorsBody">
-                                <tr>
-                                    <td>أحمد محمد</td>
-                                    <td>15,000,000 د.ع</td>
-                                    <td>05/05/2025</td>
-                                </tr>
-                                <tr>
-                                    <td>سارة أحمد</td>
-                                    <td>10,000,000 د.ع</td>
-                                    <td>01/05/2025</td>
-                                </tr>
-                                <tr>
-                                    <td>محمد علي</td>
-                                    <td>25,000,000 د.ع</td>
-                                    <td>28/04/2025</td>
-                                </tr>
-                                <tr>
-                                    <td>فاطمة حسين</td>
-                                    <td>12,000,000 د.ع</td>
-                                    <td>25/04/2025</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="table-container">
-                    <div class="table-header">
-                        <div class="table-title">آخر المعاملات</div>
-                        <div class="table-actions">
-                            <button class="btn btn-sm btn-light" onclick="printTable('recentTransactionsTable')">
-                                <i class="fas fa-print"></i> طباعة
-                            </button>
-                            <button class="btn btn-sm btn-primary" onclick="showPage('operations')">عرض الكل</button>
-                        </div>
-                    </div>
-                    <table class="table" id="recentTransactionsTable">
-                        <thead>
-                            <tr>
-                                <th>المستثمر</th>
-                                <th>العملية</th>
-                                <th>المبلغ</th>
-                                <th>التاريخ</th>
-                                <th>الحالة</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recentTransactionsBody">
-                            <tr>
-                                <td>أحمد محمد</td>
-                                <td>استثمار جديد</td>
-                                <td>15,000,000 د.ع</td>
-                                <td>05/05/2025</td>
-                                <td><span class="status active">مكتمل</span></td>
-                            </tr>
-                            <tr>
-                                <td>سارة أحمد</td>
-                                <td>دفع أرباح</td>
-                                <td>175,000 د.ع</td>
-                                <td>03/05/2025</td>
-                                <td><span class="status active">مكتمل</span></td>
-                            </tr>
-                            <tr>
-                                <td>محمد علي</td>
-                                <td>سحب جزئي</td>
-                                <td>5,000,000 د.ع</td>
-                                <td>01/05/2025</td>
-                                <td><span class="status pending">معلق</span></td>
-                            </tr>
-                            <tr>
-                                <td>فاطمة حسين</td>
-                                <td>استثمار جديد</td>
-                                <td>12,000,000 د.ع</td>
-                                <td>25/04/2025</td>
-                                <td><span class="status active">مكتمل</span></td>
-                            </tr>
-                            <tr>
-                                <td>علي حسن</td>
-                                <td>إغلاق استثمار</td>
-                                <td>8,000,000 د.ع</td>
-                                <td>20/04/2025</td>
-                                <td><span class="status closed">مغلق</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
+        
+        <div id="loadingMessage" class="message info" style="display: none;">
+            <div class="loader"></div>
+            <span>جاري معالجة الصورة...</span>
+        </div>
+        
+        <div id="errorMessage" class="message error" style="display: none;">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>حدث خطأ أثناء قراءة الرمز</span>
+        </div>
+        
+        <div id="results" class="results">
+            <div class="message success">
+                <i class="fas fa-check-circle"></i>
+                <span>تم التعرف على البطاقة بنجاح!</span>
+            </div>
+            
+            <div class="card-container">
+                <div id="cardPreview" class="investor-card">
+                    <!-- سيتم تعبئة هذا القسم بالجافاسكريبت -->
                 </div>
             </div>
-
-            <!-- Analytics Page -->
-            <div id="analytics" class="page">
-                <div class="header">
-                    <h1 class="page-title">التحليلات</h1>
-                    <div class="header-actions">
-                        <div class="search-bar">
-                            <input type="text" class="search-input" placeholder="بحث...">
-                            <i class="fas fa-search search-icon"></i>
-                        </div>
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
+            
+            <div id="cardDetails" class="card-details-container">
+                <h3>معلومات البطاقة</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>معرف البطاقة</label>
+                        <div id="cardId">-</div>
+                    </div>
+                    <div class="info-item">
+                        <label>رقم البطاقة</label>
+                        <div id="cardNumber">-</div>
+                    </div>
+                    <div class="info-item">
+                        <label>نوع البطاقة</label>
+                        <div id="cardType">-</div>
+                    </div>
+                    <div class="info-item">
+                        <label>تاريخ الانتهاء</label>
+                        <div id="cardExpiry">-</div>
                     </div>
                 </div>
-
-                <div class="tabs">
-                    <div class="tab active" onclick="switchAnalyticsTab('overview')">نظرة عامة</div>
-                    <div class="tab" onclick="switchAnalyticsTab('investments')">الاستثمارات</div>
-                    <div class="tab" onclick="switchAnalyticsTab('profits')">الأرباح</div>
-                    <div class="tab" onclick="switchAnalyticsTab('investors')">المستثمرين</div>
-                    <div class="tab" onclick="switchAnalyticsTab('trends')">الاتجاهات</div>
-                </div>
-
-                <div id="analyticsOverview" class="analytics-tab-content active">
-                    <div class="dashboard-cards">
-                        <div class="card">
-                            <div class="card-header">
-                                <div>
-                                    <div class="card-title">معدل النمو الشهري</div>
-                                    <div class="card-value">12.5%</div>
-                                    <div class="card-change up">
-                                        <i class="fas fa-arrow-up"></i>
-                                        <span>3.2% من الشهر السابق</span>
-                                    </div>
-                                </div>
-                                <div class="card-icon primary">
-                                    <i class="fas fa-chart-line"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <div>
-                                    <div class="card-title">متوسط الاستثمار</div>
-                                    <div class="card-value">10,208,333 د.ع</div>
-                                    <div class="card-change up">
-                                        <i class="fas fa-arrow-up"></i>
-                                        <span>5.8% من الشهر السابق</span>
-                                    </div>
-                                </div>
-                                <div class="card-icon success">
-                                    <i class="fas fa-calculator"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <div>
-                                    <div class="card-title">نسبة الاحتفاظ</div>
-                                    <div class="card-value">92%</div>
-                                    <div class="card-change down">
-                                        <i class="fas fa-arrow-down"></i>
-                                        <span>1.5% من الشهر السابق</span>
-                                    </div>
-                                </div>
-                                <div class="card-icon warning">
-                                    <i class="fas fa-user-check"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <div>
-                                    <div class="card-title">إجمالي العائد</div>
-                                    <div class="card-value">4,287,500 د.ع</div>
-                                    <div class="card-change up">
-                                        <i class="fas fa-arrow-up"></i>
-                                        <span>7.3% من الشهر السابق</span>
-                                    </div>
-                                </div>
-                                <div class="card-icon info">
-                                    <i class="fas fa-percentage"></i>
-                                </div>
-                            </div>
-                        </div>
+                
+                <h3>معلومات المستثمر</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>معرف المستثمر</label>
+                        <div id="investorId">-</div>
                     </div>
-
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <div class="chart-title">تحليل الأداء</div>
-                            <div class="chart-actions">
-                                <button class="btn btn-sm btn-light">اليومي</button>
-                                <button class="btn btn-sm btn-primary">الشهري</button>
-                                <button class="btn btn-sm btn-light">السنوي</button>
-                                <button class="btn btn-sm btn-light"><i class="fas fa-download"></i> تصدير</button>
-                            </div>
-                        </div>
-                        <div id="performanceChart" style="height: 400px; width: 100%;">
-                            <!-- Chart will be rendered here -->
-                            <div style="height: 400px; width: 100%; display: flex; align-items: center; justify-content: center;">
-                                <div style="text-align: center; color: var(--gray-600);">
-                                    <i class="fas fa-chart-bar fa-3x" style="margin-bottom: 10px;"></i>
-                                    <p>سيتم عرض الرسم البياني هنا</p>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="info-item">
+                        <label>اسم المستثمر</label>
+                        <div id="investorName">-</div>
                     </div>
                 </div>
-
-                <div id="analyticsInvestments" class="analytics-tab-content">
-                    <!-- Investments Tab Content -->
-                </div>
-
-                <div id="analyticsProfits" class="analytics-tab-content">
-                    <!-- Profits Tab Content -->
-                </div>
-
-                <div id="analyticsInvestors" class="analytics-tab-content">
-                    <!-- Investors Tab Content -->
-                </div>
-
-                <div id="analyticsTrends" class="analytics-tab-content">
-                    <!-- Trends Tab Content -->
-                </div>
+                
+                <div id="additionalInfo"></div>
             </div>
-
-            <!-- Investors Page -->
-            <div id="investors" class="page">
-                <div class="header">
-                    <h1 class="page-title">المستثمرين</h1>
-                    <div class="header-actions">
-                        <div class="search-bar">
-                            <input type="text" class="search-input" placeholder="بحث عن مستثمر...">
-                            <i class="fas fa-search search-icon"></i>
-                        </div>
-                        <button class="btn btn-primary" onclick="openAddInvestorModal()">
-                            <i class="fas fa-plus"></i> إضافة مستثمر
-                        </button>
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-container">
-                    <div class="table-header">
-                        <div class="table-title">قائمة المستثمرين</div>
-                        <div class="table-actions">
-                            <button class="btn btn-light" onclick="exportInvestors()">
-                                <i class="fas fa-file-export"></i> تصدير
-                            </button>
-                            <button class="btn btn-light" onclick="importInvestors()">
-                                <i class="fas fa-file-import"></i> استيراد
-                            </button>
-                            <button class="btn btn-light" onclick="printTable('investorsTable')">
-                                <i class="fas fa-print"></i> طباعة
-                            </button>
-                        </div>
-                    </div>
-                    <table class="table" id="investorsTable">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>الاسم</th>
-                                <th>رقم الهاتف</th>
-                                <th>العنوان</th>
-                                <th>رقم البطاقة</th>
-                                <th>إجمالي الاستثمار</th>
-                                <th>إجمالي الأرباح</th>
-                                <th>تاريخ الانضمام</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody id="investorsTableBody">
-                            <tr>
-                                <td>1</td>
-                                <td>أحمد محمد</td>
-                                <td>07701234567</td>
-                                <td>الحلة، بابل</td>
-                                <td>A12345678</td>
-                                <td>15,000,000 د.ع</td>
-                                <td>262,500 د.ع</td>
-                                <td>01/01/2025</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewInvestor(1)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="editInvestor(1)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteInvestor(1)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>سارة أحمد</td>
-                                <td>07709876543</td>
-                                <td>بغداد</td>
-                                <td>B87654321</td>
-                                <td>10,000,000 د.ع</td>
-                                <td>175,000 د.ع</td>
-                                <td>15/01/2025</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewInvestor(2)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="editInvestor(2)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteInvestor(2)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>محمد علي</td>
-                                <td>07712345678</td>
-                                <td>النجف</td>
-                                <td>C23456789</td>
-                                <td>25,000,000 د.ع</td>
-                                <td>437,500 د.ع</td>
-                                <td>01/02/2025</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewInvestor(3)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="editInvestor(3)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteInvestor(3)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Investments Page -->
-            <div id="investments" class="page">
-                <div class="header">
-                    <h1 class="page-title">الاستثمارات</h1>
-                    <div class="header-actions">
-                        <div class="search-bar">
-                            <input type="text" class="search-input" placeholder="بحث...">
-                            <i class="fas fa-search search-icon"></i>
-                        </div>
-                        <button class="btn btn-primary" onclick="openNewInvestmentModal()">
-                            <i class="fas fa-plus"></i> استثمار جديد
-                        </button>
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tabs">
-                    <div class="tab active" onclick="switchInvestmentsTab('active')">الاستثمارات النشطة</div>
-                    <div class="tab" onclick="switchInvestmentsTab('closed')">الاستثمارات المغلقة</div>
-                    <div class="tab" onclick="switchInvestmentsTab('all')">جميع الاستثمارات</div>
-                </div>
-
-                <div class="table-container">
-                    <div class="table-header">
-                        <div class="table-title">الاستثمارات النشطة</div>
-                        <div class="table-actions">
-                            <button class="btn btn-light" onclick="exportInvestments()">
-                                <i class="fas fa-file-export"></i> تصدير
-                            </button>
-                            <button class="btn btn-light" onclick="printTable('investmentsTable')">
-                                <i class="fas fa-print"></i> طباعة
-                            </button>
-                        </div>
-                    </div>
-                    <table class="table" id="investmentsTable">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>المستثمر</th>
-                                <th>المبلغ</th>
-                                <th>تاريخ الاستثمار</th>
-                                <th>الربح الشهري</th>
-                                <th>إجمالي الأرباح</th>
-                                <th>الحالة</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody id="investmentsTableBody">
-                            <tr>
-                                <td>1</td>
-                                <td>أحمد محمد</td>
-                                <td>15,000,000 د.ع</td>
-                                <td>01/01/2025</td>
-                                <td>262,500 د.ع</td>
-                                <td>1,050,000 د.ع</td>
-                                <td><span class="status active">نشط</span></td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewInvestment(1)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="openWithdrawModal(1)">
-                                        <i class="fas fa-minus"></i>
-                                    </button>
-                                    <button class="btn btn-success btn-icon action-btn" onclick="openPayProfitModal(1)">
-                                        <i class="fas fa-money-bill"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>سارة أحمد</td>
-                                <td>10,000,000 د.ع</td>
-                                <td>15/01/2025</td>
-                                <td>175,000 د.ع</td>
-                                <td>612,500 د.ع</td>
-                                <td><span class="status active">نشط</span></td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewInvestment(2)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="openWithdrawModal(2)">
-                                        <i class="fas fa-minus"></i>
-                                    </button>
-                                    <button class="btn btn-success btn-icon action-btn" onclick="openPayProfitModal(2)">
-                                        <i class="fas fa-money-bill"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>محمد علي</td>
-                                <td>25,000,000 د.ع</td>
-                                <td>01/02/2025</td>
-                                <td>437,500 د.ع</td>
-                                <td>1,312,500 د.ع</td>
-                                <td><span class="status active">نشط</span></td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewInvestment(3)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="openWithdrawModal(3)">
-                                        <i class="fas fa-minus"></i>
-                                    </button>
-                                    <button class="btn btn-success btn-icon action-btn" onclick="openPayProfitModal(3)">
-                                        <i class="fas fa-money-bill"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Profits Page -->
-            <div id="profits" class="page">
-                <div class="header">
-                    <h1 class="page-title">الأرباح</h1>
-                    <div class="header-actions">
-                        <button class="btn btn-primary" onclick="openPayProfitModal()">
-                            <i class="fas fa-money-bill"></i> دفع أرباح
-                        </button>
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tabs">
-                    <div class="tab active" onclick="switchProfitsTab('summary')">ملخص الأرباح</div>
-                    <div class="tab" onclick="switchProfitsTab('paid')">الأرباح المدفوعة</div>
-                    <div class="tab" onclick="switchProfitsTab('due')">الأرباح المستحقة</div>
-                    <div class="tab" onclick="switchProfitsTab('projections')">توقعات الأرباح</div>
-                </div>
-
-                <div class="dashboard-cards">
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">إجمالي الأرباح</div>
-                                <div class="card-value">4,287,500 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>12% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon primary">
-                                <i class="fas fa-hand-holding-usd"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">الأرباح المدفوعة</div>
-                                <div class="card-value">1,312,500 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>8% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon success">
-                                <i class="fas fa-check-circle"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">الأرباح المستحقة</div>
-                                <div class="card-value">2,975,000 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>15% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon warning">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">متوسط العائد الشهري</div>
-                                <div class="card-value">1.75%</div>
-                                <div class="card-change">
-                                    <i class="fas fa-minus"></i>
-                                    <span>ثابت</span>
-                                </div>
-                            </div>
-                            <div class="card-icon info">
-                                <i class="fas fa-percentage"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="chart-container">
-                    <div class="chart-header">
-                        <div class="chart-title">تحليل الأرباح</div>
-                        <div class="chart-actions">
-                            <button class="btn btn-sm btn-light">اليومي</button>
-                            <button class="btn btn-sm btn-primary">الشهري</button>
-                            <button class="btn btn-sm btn-light">السنوي</button>
-                            <button class="btn btn-sm btn-light"><i class="fas fa-download"></i> تصدير</button>
-                        </div>
-                    </div>
-                    <div id="profitsChart" style="height: 300px; width: 100%;">
-                        <!-- Chart will be rendered here -->
-                        <div style="height: 300px; width: 100%; display: flex; align-items: center; justify-content: center;">
-                            <div style="text-align: center; color: var(--gray-600);">
-                                <i class="fas fa-chart-line fa-3x" style="margin-bottom: 10px;"></i>
-                                <p>سيتم عرض الرسم البياني هنا</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-container">
-                    <div class="table-header">
-                        <div class="table-title">تفاصيل الأرباح</div>
-                        <div class="table-actions">
-                            <button class="btn btn-light" onclick="exportProfits()">
-                                <i class="fas fa-file-export"></i> تصدير
-                            </button>
-                            <button class="btn btn-light" onclick="printTable('profitsTable')">
-                                <i class="fas fa-print"></i> طباعة
-                            </button>
-                        </div>
-                    </div>
-                    <table class="table" id="profitsTable">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>المستثمر</th>
-                                <th>مبلغ الاستثمار</th>
-                                <th>تاريخ الاستثمار</th>
-                                <th>الربح الشهري</th>
-                                <th>إجمالي الأرباح</th>
-                                <th>الأرباح المدفوعة</th>
-                                <th>الأرباح المستحقة</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody id="profitsTableBody">
-                            <tr>
-                                <td>1</td>
-                                <td>أحمد محمد</td>
-                                <td>15,000,000 د.ع</td>
-                                <td>01/01/2025</td>
-                                <td>262,500 د.ع</td>
-                                <td>1,050,000 د.ع</td>
-                                <td>525,000 د.ع</td>
-                                <td>525,000 د.ع</td>
-                                <td>
-                                    <button class="btn btn-success btn-icon action-btn" onclick="openPayProfitModal(1)">
-                                        <i class="fas fa-money-bill"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>سارة أحمد</td>
-                                <td>10,000,000 د.ع</td>
-                                <td>15/01/2025</td>
-                                <td>175,000 د.ع</td>
-                                <td>612,500 د.ع</td>
-                                <td>175,000 د.ع</td>
-                                <td>437,500 د.ع</td>
-                                <td>
-                                    <button class="btn btn-success btn-icon action-btn" onclick="openPayProfitModal(2)">
-                                        <i class="fas fa-money-bill"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>محمد علي</td>
-                                <td>25,000,000 د.ع</td>
-                                <td>01/02/2025</td>
-                                <td>437,500 د.ع</td>
-                                <td>1,312,500 د.ع</td>
-                                <td>437,500 د.ع</td>
-                                <td>875,000 د.ع</td>
-                                <td>
-                                    <button class="btn btn-success btn-icon action-btn" onclick="openPayProfitModal(3)">
-                                        <i class="fas fa-money-bill"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Operations Page -->
-            <div id="operations" class="page">
-                <div class="header">
-                    <h1 class="page-title">العمليات</h1>
-                    <div class="header-actions">
-                        <div class="search-bar">
-                            <input type="text" class="search-input" placeholder="بحث...">
-                            <i class="fas fa-search search-icon"></i>
-                        </div>
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tabs">
-                    <div class="tab active" onclick="switchOperationsTab('all')">جميع العمليات</div>
-                    <div class="tab" onclick="switchOperationsTab('investments')">الاستثمارات</div>
-                    <div class="tab" onclick="switchOperationsTab('withdrawals')">السحوبات</div>
-                    <div class="tab" onclick="switchOperationsTab('profits')">الأرباح</div>
-                    <div class="tab" onclick="switchOperationsTab('pending')">معلقة</div>
-                </div>
-
-                <div class="form-container">
-                    <div class="form-header">
-                        <h2 class="form-title">إجراء عملية جديدة</h2>
-                        <p class="form-subtitle">اختر نوع العملية التي تريد إجراءها</p>
-                    </div>
-                    <div class="form-row">
-                        <button class="btn btn-success" onclick="openNewInvestmentModal()">
-                            <i class="fas fa-plus"></i> استثمار جديد
-                        </button>
-                        <button class="btn btn-warning" onclick="openWithdrawModal()">
-                            <i class="fas fa-minus"></i> سحب
-                        </button>
-                        <button class="btn btn-primary" onclick="openPayProfitModal()">
-                            <i class="fas fa-money-bill"></i> دفع أرباح
-                        </button>
-                    </div>
-                </div>
-
-                <div class="table-container">
-                    <div class="table-header">
-                        <div class="table-title">سجل العمليات</div>
-                        <div class="table-actions">
-                            <button class="btn btn-light" onclick="exportOperations()">
-                                <i class="fas fa-file-export"></i> تصدير
-                            </button>
-                            <button class="btn btn-light" onclick="printTable('operationsTable')">
-                                <i class="fas fa-print"></i> طباعة
-                            </button>
-                        </div>
-                    </div>
-                    <table class="table" id="operationsTable">
-                        <thead>
-                            <tr>
-                                <th>رقم العملية</th>
-                                <th>المستثمر</th>
-                                <th>نوع العملية</th>
-                                <th>المبلغ</th>
-                                <th>التاريخ</th>
-                                <th>الوقت</th>
-                                <th>الحالة</th>
-                                <th>ملاحظات</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody id="operationsTableBody">
-                            <tr>
-                                <td>OP-2025-001</td>
-                                <td>أحمد محمد</td>
-                                <td>استثمار جديد</td>
-                                <td>15,000,000 د.ع</td>
-                                <td>01/01/2025</td>
-                                <td>10:30:45</td>
-                                <td><span class="status active">مكتمل</span></td>
-                                <td>استثمار جديد</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewOperation('OP-2025-001')">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>OP-2025-002</td>
-                                <td>سارة أحمد</td>
-                                <td>استثمار جديد</td>
-                                <td>10,000,000 د.ع</td>
-                                <td>15/01/2025</td>
-                                <td>11:45:22</td>
-                                <td><span class="status active">مكتمل</span></td>
-                                <td>استثمار جديد</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewOperation('OP-2025-002')">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>OP-2025-003</td>
-                                <td>محمد علي</td>
-                                <td>استثمار جديد</td>
-                                <td>25,000,000 د.ع</td>
-                                <td>01/02/2025</td>
-                                <td>09:15:10</td>
-                                <td><span class="status active">مكتمل</span></td>
-                                <td>استثمار جديد</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewOperation('OP-2025-003')">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>OP-2025-004</td>
-                                <td>أحمد محمد</td>
-                                <td>دفع أرباح</td>
-                                <td>262,500 د.ع</td>
-                                <td>01/02/2025</td>
-                                <td>14:22:30</td>
-                                <td><span class="status active">مكتمل</span></td>
-                                <td>دفع الأرباح الشهرية</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewOperation('OP-2025-004')">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>OP-2025-005</td>
-                                <td>سارة أحمد</td>
-                                <td>دفع أرباح</td>
-                                <td>175,000 د.ع</td>
-                                <td>15/02/2025</td>
-                                <td>10:05:15</td>
-                                <td><span class="status active">مكتمل</span></td>
-                                <td>دفع الأرباح الشهرية</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewOperation('OP-2025-005')">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>OP-2025-006</td>
-                                <td>محمد علي</td>
-                                <td>سحب جزئي</td>
-                                <td>5,000,000 د.ع</td>
-                                <td>01/05/2025</td>
-                                <td>09:30:00</td>
-                                <td><span class="status pending">معلق</span></td>
-                                <td>سحب جزئي بطلب من المستثمر</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewOperation('OP-2025-006')">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-success btn-icon action-btn" onclick="approveOperation('OP-2025-006')">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="rejectOperation('OP-2025-006')">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Reports Page -->
-            <div id="reports" class="page">
-                <div class="header">
-                    <h1 class="page-title">التقارير</h1>
-                    <div class="header-actions">
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-container">
-                    <div class="form-header">
-                        <h2 class="form-title">إنشاء تقرير مخصص</h2>
-                        <p class="form-subtitle">قم بتحديد نوع التقرير والفترة الزمنية</p>
-                    </div>
-                    <form id="customReportForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">نوع التقرير</label>
-                                <select class="form-select" id="reportType" required>
-                                  <option value="">اختر نوع التقرير</option>
-                                    <option value="investors">المستثمرين</option>
-                                    <option value="investments">الاستثمارات</option>
-                                    <option value="profits">الأرباح</option>
-                                    <option value="operations">العمليات</option>
-                                    <option value="financial">التقرير المالي</option>
-                                    <option value="summary">ملخص عام</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">المستثمر (اختياري)</label>
-                                <select class="form-select" id="reportInvestor">
-                                    <option value="">جميع المستثمرين</option>
-                                    <!-- Will be populated by JavaScript -->
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">من تاريخ</label>
-                                <input type="date" class="form-control" id="reportFromDate">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">إلى تاريخ</label>
-                                <input type="date" class="form-control" id="reportToDate">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">تنسيق التقرير</label>
-                            <div class="form-row">
-                                <div class="form-check">
-                                    <input type="radio" class="form-check-input" id="formatTable" name="reportFormat" value="table" checked>
-                                    <label class="form-check-label" for="formatTable">جدول</label>
-                                </div>
-                                <div class="form-check">
-                                    <input type="radio" class="form-check-input" id="formatChart" name="reportFormat" value="chart">
-                                    <label class="form-check-label" for="formatChart">رسم بياني</label>
-                                </div>
-                                <div class="form-check">
-                                    <input type="radio" class="form-check-input" id="formatPdf" name="reportFormat" value="pdf">
-                                    <label class="form-check-label" for="formatPdf">PDF</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-file-alt"></i> إنشاء التقرير
-                            </button>
-                            <button type="reset" class="btn btn-light">
-                                <i class="fas fa-redo"></i> إعادة تعيين
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="tabs">
-                    <div class="tab active" onclick="switchReportsTab('recent')">التقارير الأخيرة</div>
-                    <div class="tab" onclick="switchReportsTab('saved')">التقارير المحفوظة</div>
-                    <div class="tab" onclick="switchReportsTab('scheduled')">التقارير المجدولة</div>
-                </div>
-
-                <div class="table-container" id="recentReports">
-                    <div class="table-header">
-                        <div class="table-title">التقارير الأخيرة</div>
-                    </div>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>اسم التقرير</th>
-                                <th>النوع</th>
-                                <th>تاريخ الإنشاء</th>
-                                <th>المنشئ</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>تقرير الأرباح الشهري</td>
-                                <td>الأرباح</td>
-                                <td>01/05/2025</td>
-                                <td>المدير</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewReport(1)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-primary btn-icon action-btn" onclick="downloadReport(1)">
-                                        <i class="fas fa-download"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteReport(1)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>تقرير المستثمرين النشطين</td>
-                                <td>المستثمرين</td>
-                                <td>28/04/2025</td>
-                                <td>المدير</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewReport(2)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-primary btn-icon action-btn" onclick="downloadReport(2)">
-                                        <i class="fas fa-download"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteReport(2)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>تقرير العمليات الأسبوعي</td>
-                                <td>العمليات</td>
-                                <td>25/04/2025</td>
-                                <td>المدير</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewReport(3)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-primary btn-icon action-btn" onclick="downloadReport(3)">
-                                        <i class="fas fa-download"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteReport(3)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="table-container" id="reportResult" style="display: none;">
-                    <div class="table-header">
-                        <div class="table-title" id="reportTitle">نتائج التقرير</div>
-                        <div class="table-actions">
-                            <button class="btn btn-light" onclick="printTable('reportTable')">
-                                <i class="fas fa-print"></i> طباعة
-                            </button>
-                            <button class="btn btn-primary" onclick="saveReport()">
-                                <i class="fas fa-save"></i> حفظ التقرير
-                            </button>
-                            <button class="btn btn-light" onclick="closeReport()">
-                                <i class="fas fa-times"></i> إغلاق
-                            </button>
-                        </div>
-                    </div>
-                    <div id="reportContent">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Financial Reports Page -->
-            <div id="financial" class="page">
-                <div class="header">
-                    <h1 class="page-title">التقارير المالية</h1>
-                    <div class="header-actions">
-                        <div class="search-bar">
-                            <input type="text" class="search-input" placeholder="بحث...">
-                            <i class="fas fa-search search-icon"></i>
-                        </div>
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tabs">
-                    <div class="tab active" onclick="switchFinancialTab('summary')">ملخص مالي</div>
-                    <div class="tab" onclick="switchFinancialTab('income')">تقرير الدخل</div>
-                    <div class="tab" onclick="switchFinancialTab('cashflow')">التدفق النقدي</div>
-                    <div class="tab" onclick="switchFinancialTab('projections')">التوقعات المالية</div>
-                </div>
-
-                <div class="dashboard-cards">
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">إجمالي الدخل</div>
-                                <div class="card-value">250,000,000 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>10% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon primary">
-                                <i class="fas fa-money-check-alt"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">إجمالي المصروفات</div>
-                                <div class="card-value">1,500,000 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>5% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon danger">
-                                <i class="fas fa-file-invoice"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">صافي الربح</div>
-                                <div class="card-value">4,287,500 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>12% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon success">
-                                <i class="fas fa-chart-line"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">الرصيد الحالي</div>
-                                <div class="card-value">248,500,000 د.ع</div>
-                                <div class="card-change up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <span>9.8% منذ الشهر الماضي</span>
-                                </div>
-                            </div>
-                            <div class="card-icon info">
-                                <i class="fas fa-wallet"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid-layout">
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <div class="chart-title">تحليل الإيرادات والمصروفات</div>
-                            <div class="chart-actions">
-                                <button class="btn btn-sm btn-light">اليومي</button>
-                                <button class="btn btn-sm btn-primary">الشهري</button>
-                                <button class="btn btn-sm btn-light">السنوي</button>
-                                <button class="btn btn-sm btn-light"><i class="fas fa-download"></i> تصدير</button>
-                            </div>
-                        </div>
-                        <div id="financialChart" style="height: 300px; width: 100%;">
-                            <!-- Chart will be rendered here -->
-                            <div style="height: 300px; width: 100%; display: flex; align-items: center; justify-content: center;">
-                                <div style="text-align: center; color: var(--gray-600);">
-                                    <i class="fas fa-chart-bar fa-3x" style="margin-bottom: 10px;"></i>
-                                    <p>سيتم عرض الرسم البياني هنا</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="table-container">
-                        <div class="table-header">
-                            <div class="table-title">ملخص الدخل</div>
-                            <button class="btn btn-sm btn-primary" onclick="generateIncomeReport()">
-                                <i class="fas fa-file-export"></i> تقرير كامل
-                            </button>
-                        </div>
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>البند</th>
-                                    <th>المبلغ</th>
-                                    <th>التغيير</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>اشتراكات المستثمرين</td>
-                                    <td>245,000,000 د.ع</td>
-                                    <td><span class="card-change up"><i class="fas fa-arrow-up"></i> 8%</span></td>
-                                </tr>
-                                <tr>
-                                    <td>عمولات الخدمات</td>
-                                    <td>5,000,000 د.ع</td>
-                                    <td><span class="card-change up"><i class="fas fa-arrow-up"></i> 15%</span></td>
-                                </tr>
-                                <tr>
-                                    <td>مصاريف التشغيل</td>
-                                    <td>1,200,000 د.ع</td>
-                                    <td><span class="card-change up"><i class="fas fa-arrow-up"></i> 3%</span></td>
-                                </tr>
-                                <tr>
-                                    <td>مصاريف الموظفين</td>
-                                    <td>300,000 د.ع</td>
-                                    <td><span class="card-change up"><i class="fas fa-arrow-up"></i> 5%</span></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="form-container">
-                    <div class="form-header">
-                        <h2 class="form-title">تقرير مالي مخصص</h2>
-                        <p class="form-subtitle">قم بتحديد نوع التقرير والفترة الزمنية</p>
-                    </div>
-                    <form id="financialReportForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">نوع التقرير</label>
-                                <select class="form-select" id="financialReportType" required>
-                                    <option value="">اختر نوع التقرير</option>
-                                    <option value="income">تقرير الدخل</option>
-                                    <option value="expense">تقرير المصروفات</option>
-                                    <option value="cashflow">تقرير التدفق النقدي</option>
-                                    <option value="profit">تقرير الأرباح والخسائر</option>
-                                    <option value="balance">تقرير الميزانية</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">الفترة</label>
-                                <select class="form-select" id="financialReportPeriod" required>
-                                    <option value="">اختر الفترة</option>
-                                    <option value="daily">يومي</option>
-                                    <option value="weekly">أسبوعي</option>
-                                    <option value="monthly">شهري</option>
-                                    <option value="quarterly">ربع سنوي</option>
-                                    <option value="yearly">سنوي</option>
-                                    <option value="custom">مخصص</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row" id="customDateRange" style="display: none;">
-                            <div class="form-group">
-                                <label class="form-label">من تاريخ</label>
-                                <input type="date" class="form-control" id="financialFromDate">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">إلى تاريخ</label>
-                                <input type="date" class="form-control" id="financialToDate">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-file-alt"></i> إنشاء التقرير
-                            </button>
-                            <button type="reset" class="btn btn-light">
-                                <i class="fas fa-redo"></i> إعادة تعيين
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Calendar Page -->
-            <div id="calendar" class="page">
-                <div class="header">
-                    <h1 class="page-title">التقويم</h1>
-                    <div class="header-actions">
-                        <button class="btn btn-primary" onclick="addEvent()">
-                            <i class="fas fa-plus"></i> إضافة حدث
-                        </button>
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tabs">
-                    <div class="tab active" onclick="switchCalendarView('month')">شهري</div>
-                    <div class="tab" onclick="switchCalendarView('week')">أسبوعي</div>
-                    <div class="tab" onclick="switchCalendarView('day')">يومي</div>
-                    <div class="tab" onclick="switchCalendarView('agenda')">الأجندة</div>
-                </div>
-
-                <div class="form-container">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <button class="btn btn-light" onclick="prevMonth()">
-                                <i class="fas fa-chevron-right"></i>
-                            </button>
-                        </div>
-                        <div class="form-group" style="flex: 1; text-align: center;">
-                            <h2 id="currentMonth">مايو 2025</h2>
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-light" onclick="nextMonth()">
-                                <i class="fas fa-chevron-left"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="calendar-container" style="background: white; border-radius: var(--border-radius); box-shadow: var(--box-shadow); padding: 20px; margin-bottom: 30px;">
-                    <div class="calendar-header" style="display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 10px;">
-                        <div class="calendar-day-name" style="text-align: center; font-weight: 600; padding: 10px;">الأحد</div>
-                        <div class="calendar-day-name" style="text-align: center; font-weight: 600; padding: 10px;">الإثنين</div>
-                        <div class="calendar-day-name" style="text-align: center; font-weight: 600; padding: 10px;">الثلاثاء</div>
-                        <div class="calendar-day-name" style="text-align: center; font-weight: 600; padding: 10px;">الأربعاء</div>
-                        <div class="calendar-day-name" style="text-align: center; font-weight: 600; padding: 10px;">الخميس</div>
-                        <div class="calendar-day-name" style="text-align: center; font-weight: 600; padding: 10px;">الجمعة</div>
-                        <div class="calendar-day-name" style="text-align: center; font-weight: 600; padding: 10px;">السبت</div>
-                    </div>
-                    <div class="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(5, 1fr); gap: 5px; height: 600px;">
-                        <!-- Calendar will be rendered here -->
-                        <!-- Example of a day cell -->
-                        <div class="calendar-day" style="background: var(--gray-100); border-radius: var(--border-radius-sm); padding: 10px; min-height: 100px; position: relative;">
-                            <div class="day-number" style="font-weight: 600;">1</div>
-                            <div class="day-events">
-                                <div class="event" style="background: var(--primary-color); color: white; padding: 5px; border-radius: 4px; margin-top: 5px; font-size: 0.8rem;">
-                                    دفع أرباح
-                                </div>
-                            </div>
-                        </div>
-                        <!-- More day cells will be added by JavaScript -->
-                    </div>
-                </div>
-
-                <div class="table-container">
-                    <div class="table-header">
-                        <div class="table-title">الأحداث القادمة</div>
-                    </div>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>العنوان</th>
-                                <th>التاريخ</th>
-                                <th>الوقت</th>
-                                <th>النوع</th>
-                                <th>ملاحظات</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>دفع أرباح - أحمد محمد</td>
-                                <td>01/06/2025</td>
-                                <td>10:00</td>
-                                <td>دفع أرباح</td>
-                                <td>دفع الأرباح الشهرية</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewEvent(1)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="editEvent(1)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteEvent(1)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>اجتماع المستثمرين</td>
-                                <td>15/06/2025</td>
-                                <td>14:00</td>
-                                <td>اجتماع</td>
-                                <td>مناقشة خطة الاستثمار للربع القادم</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewEvent(2)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="editEvent(2)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteEvent(2)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>تجديد عقد استثمار - محمد علي</td>
-                                <td>01/07/2025</td>
-                                <td>11:30</td>
-                                <td>عقد</td>
-                                <td>تجديد عقد استثمار لمدة سنة</td>
-                                <td>
-                                    <button class="btn btn-info btn-icon action-btn" onclick="viewEvent(3)">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-icon action-btn" onclick="editEvent(3)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-icon action-btn" onclick="deleteEvent(3)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Settings Page -->
-            <div id="settings" class="page">
-                <div class="header">
-                    <h1 class="page-title">الإعدادات</h1>
-                    <div class="header-actions">
-                        <div class="notification-btn" onclick="toggleNotificationPanel()">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge">5</span>
-                        </div>
-                        <div class="menu-toggle" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tabs">
-                    <div class="tab active" onclick="switchSettingsTab('general')">عام</div>
-                    <div class="tab" onclick="switchSettingsTab('investment')">الاستثمار</div>
-                    <div class="tab" onclick="switchSettingsTab('profile')">الملف الشخصي</div>
-                    <div class="tab" onclick="switchSettingsTab('notifications')">الإشعارات</div>
-                    <div class="tab" onclick="switchSettingsTab('backup')">النسخ الاحتياطي</div>
-                    <div class="tab" onclick="switchSettingsTab('system')">النظام</div>
-                </div>
-
-                <div id="generalSettings" class="settings-tab-content active">
-                    <div class="form-container">
-                        <div class="form-header">
-                            <h2 class="form-title">إعدادات عامة</h2>
-                            <p class="form-subtitle">إعدادات النظام الأساسية</p>
-                        </div>
-                        <form id="generalSettingsForm">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">اسم الشركة</label>
-                                    <input type="text" class="form-control" id="companyName" value="شركة الاستثمار العراقية">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">شعار الشركة</label>
-                                    <input type="file" class="form-control" id="companyLogo">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">عنوان الشركة</label>
-                                    <input type="text" class="form-control" id="companyAddress" value="الحلة، بابل، العراق">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">رقم الهاتف</label>
-                                    <input type="text" class="form-control" id="companyPhone" value="07701234567">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">البريد الإلكتروني</label>
-                                    <input type="email" class="form-control" id="companyEmail" value="info@iraqinvest.com">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">الموقع الإلكتروني</label>
-                                    <input type="text" class="form-control" id="companyWebsite" value="www.iraqinvest.com">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">اللغة</label>
-                                    <select class="form-select" id="language">
-                                        <option value="ar" selected>العربية</option>
-                                        <option value="en">الإنجليزية</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">المنطقة الزمنية</label>
-                                    <select class="form-select" id="timezone">
-                                        <option value="Asia/Baghdad" selected>بغداد (GMT+3)</option>
-                                        <option value="Asia/Dubai">دبي (GMT+4)</option>
-                                        <option value="Europe/London">لندن (GMT+0)</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> حفظ الإعدادات
-                                </button>
-                                <button type="reset" class="btn btn-light">
-                                    <i class="fas fa-redo"></i> إعادة تعيين
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div id="investmentSettings" class="settings-tab-content">
-                    <div class="form-container">
-                        <div class="form-header">
-                            <h2 class="form-title">إعدادات الاستثمار</h2>
-                            <p class="form-subtitle">إعدادات الاستثمار والأرباح</p>
-                        </div>
-                        <form id="investmentSettingsForm">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">نسبة الربح الشهرية (%)</label>
-                                    <input type="number" class="form-control" id="monthlyProfitRate" step="0.01" value="1.75" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">الحد الأدنى للاستثمار</label>
-                                    <input type="number" class="form-control" id="minInvestment" value="1000000" required>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">فترة توزيع الأرباح</label>
-                                    <select class="form-select" id="profitDistributionPeriod">
-                                        <option value="monthly" selected>شهرياً</option>
-                                        <option value="quarterly">ربع سنوي</option>
-                                        <option value="yearly">سنوياً</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">يوم توزيع الأرباح</label>
-                                    <input type="number" class="form-control" id="profitDistributionDay" min="1" max="31" value="1" required>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">رسوم السحب المبكر (%)</label>
-                                    <input type="number" class="form-control" id="earlyWithdrawalFee" step="0.01" value="0.5" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">الحد الأقصى للسحب الجزئي (%)</label>
-                                    <input type="number" class="form-control" id="maxPartialWithdrawal" step="1" value="50" required>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">عملة النظام</label>
-                                    <select class="form-select" id="currency">
-                                        <option value="IQD" selected>دينار عراقي</option>
-                                        <option value="USD">دولار أمريكي</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">العملات المقبولة</label>
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="acceptIQD" checked>
-                                        <label class="form-check-label" for="acceptIQD">دينار عراقي</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="acceptUSD" checked>
-                                        <label class="form-check-label" for="acceptUSD">دولار أمريكي</label>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> حفظ الإعدادات
-                                </button>
-                                <button type="reset" class="btn btn-light">
-                                    <i class="fas fa-redo"></i> إعادة تعيين
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div id="profileSettings" class="settings-tab-content">
-                    <!-- Profile Settings Content -->
-                </div>
-
-                <div id="notificationSettings" class="settings-tab-content">
-                    <!-- Notification Settings Content -->
-                </div>
-
-                <div id="backupSettings" class="settings-tab-content">
-                    <div class="form-container">
-                        <div class="form-header">
-                            <h2 class="form-title">النسخ الاحتياطي واستعادة البيانات</h2>
-                            <p class="form-subtitle">إدارة البيانات والنسخ الاحتياطي</p>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">إنشاء نسخة احتياطية</label>
-                                <button class="btn btn-primary" onclick="createBackup()">
-                                    <i class="fas fa-download"></i> إنشاء نسخة احتياطية
-                                </button>
-                                <p class="form-text">قم بإنشاء نسخة احتياطية كاملة من جميع بيانات النظام.</p>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">النسخ الاحتياطية التلقائية</label>
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="autoBackup" checked>
-                                    <label class="form-check-label" for="autoBackup">تفعيل النسخ الاحتياطي التلقائي</label>
-                                </div>
-                                <select class="form-select" id="autoBackupFrequency" style="margin-top: 10px;">
-                                    <option value="daily">يومياً</option>
-                                    <option value="weekly" selected>أسبوعياً</option>
-                                    <option value="monthly">شهرياً</option>
-                                </select>
-                                <p class="form-text">سيتم إنشاء نسخة احتياطية تلقائياً حسب الجدول المحدد.</p>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">استعادة من نسخة احتياطية</label>
-                                <input type="file" class="form-control" id="restoreFile" accept=".json">
-                                <button class="btn btn-warning" onclick="restoreBackup()" style="margin-top: 10px;">
-                                    <i class="fas fa-upload"></i> استعادة
-                                </button>
-                                <p class="form-text">تحذير: سيتم استبدال جميع البيانات الحالية بالبيانات من النسخة الاحتياطية.</p>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">النسخ الاحتياطية السابقة</label>
-                                <select class="form-select" id="previousBackups" size="5" style="height: auto;">
-                                    <option value="backup_20250505.json">05/05/2025 - 10:30</option>
-                                    <option value="backup_20250428.json">28/04/2025 - 09:15</option>
-                                    <option value="backup_20250421.json">21/04/2025 - 11:45</option>
-                                    <option value="backup_20250414.json">14/04/2025 - 16:20</option>
-                                    <option value="backup_20250407.json">07/04/2025 - 08:30</option>
-                                </select>
-                                <div style="margin-top: 10px;">
-                                    <button class="btn btn-light btn-sm" onclick="downloadSelectedBackup()">
-                                        <i class="fas fa-download"></i> تنزيل
-                                    </button>
-                                    <button class="btn btn-light btn-sm" onclick="restoreSelectedBackup()">
-                                        <i class="fas fa-upload"></i> استعادة
-                                    </button>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteSelectedBackup()">
-                                        <i class="fas fa-trash"></i> حذف
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">تصدير البيانات</label>
-                            <div class="form-row">
-                                <button class="btn btn-light" onclick="exportInvestors()">
-                                    <i class="fas fa-file-export"></i> المستثمرين
-                                </button>
-                                <button class="btn btn-light" onclick="exportInvestments()">
-                                    <i class="fas fa-file-export"></i> الاستثمارات
-                                </button>
-                                <button class="btn btn-light" onclick="exportOperations()">
-                                    <i class="fas fa-file-export"></i> العمليات
-                                </button>
-                                <button class="btn btn-light" onclick="exportReports()">
-                                    <i class="fas fa-file-export"></i> التقارير
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="systemSettings" class="settings-tab-content">
-                    <!-- System Settings Content -->
-                </div>
+            
+            <div class="actions">
+                <button class="btn btn-primary" onclick="scanAgain()">
+                    <i class="fas fa-qrcode"></i>
+                    مسح جديد
+                </button>
+                <button class="btn btn-secondary" onclick="getDetailedInfo()">
+                    <i class="fas fa-info-circle"></i>
+                    معلومات مفصلة
+                </button>
             </div>
         </div>
     </div>
+    
+    <div id="notifications-container"></div>
+    
+    <!-- إضافة مكتبات القراءة -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
-    <!-- Notification Panel -->
-    <div class="notification-panel" id="notificationPanel">
-        <div class="notification-header">
-            <h2 class="notification-title">الإشعارات</h2>
-            <div class="modal-close" onclick="toggleNotificationPanel()">
-                <i class="fas fa-times"></i>
-            </div>
-        </div>
-        <div class="notification-list">
-            <div class="notification-item">
-                <div class="notification-icon" style="background: var(--primary-color);">
-                    <i class="fas fa-user-plus"></i>
-                </div>
-                <div class="notification-info">
-                    <div class="notification-text">تم إضافة مستثمر جديد: أحمد محمد</div>
-                    <div class="notification-time">منذ 30 دقيقة</div>
-                </div>
-            </div>
-            <div class="notification-item">
-                <div class="notification-icon" style="background: var(--success-color);">
-                    <i class="fas fa-money-bill-wave"></i>
-                </div>
-                <div class="notification-info">
-                    <div class="notification-text">تم إجراء استثمار جديد بقيمة 15,000,000 د.ع</div>
-                    <div class="notification-time">منذ ساعتين</div>
-                </div>
-            </div>
-            <div class="notification-item">
-                <div class="notification-icon" style="background: var(--warning-color);">
-                    <i class="fas fa-calendar-day"></i>
-                </div>
-                <div class="notification-info">
-                    <div class="notification-text">موعد دفع الأرباح الشهرية بعد 3 أيام</div>
-                    <div class="notification-time">منذ 5 ساعات</div>
-                </div>
-            </div>
-            <div class="notification-item">
-                <div class="notification-icon" style="background: var(--info-color);">
-                    <i class="fas fa-chart-line"></i>
-                </div>
-                <div class="notification-info">
-                    <div class="notification-text">تم إنشاء تقرير الأرباح الشهري</div>
-                    <div class="notification-time">منذ يوم واحد</div>
-                </div>
-            </div>
-            <div class="notification-item">
-                <div class="notification-icon" style="background: var(--danger-color);">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-                <div class="notification-info">
-                    <div class="notification-text">طلب سحب معلق بحاجة للموافقة</div>
-                    <div class="notification-time">منذ يومين</div>
-                </div>
-            </div>
-        </div>
-        <div class="notification-actions">
-            <button class="btn btn-light" onclick="markAllAsRead()">
-                <i class="fas fa-check-double"></i> تعيين الكل كمقروء
-            </button>
-        </div>
-    </div>
-
-    <!-- Add Investor Modal -->
-    <div class="modal-overlay" id="addInvestorModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 class="modal-title">إضافة مستثمر جديد</h2>
-                <div class="modal-close" onclick="closeModal('addInvestorModal')">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div class="modal-tabs">
-                    <div class="modal-tab active" onclick="switchModalTab('investorInfo', 'addInvestorModal')">معلومات المستثمر</div>
-                    <div class="modal-tab" onclick="switchModalTab('investmentInfo', 'addInvestorModal')">معلومات الاستثمار</div>
-                    <div class="modal-tab" onclick="switchModalTab('documents', 'addInvestorModal')">المستندات</div>
-                </div>
-                <div class="modal-tab-content active" id="investorInfo">
-                    <form id="investorForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">الاسم الكامل</label>
-                                <input type="text" class="form-control" id="investorName" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">رقم الهاتف</label>
-                                <input type="text" class="form-control" id="investorPhone" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">البريد الإلكتروني</label>
-                                <input type="email" class="form-control" id="investorEmail">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">تاريخ الميلاد</label>
-                                <input type="date" class="form-control" id="investorBirthdate">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">العنوان</label>
-                                <input type="text" class="form-control" id="investorAddress" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">المدينة</label>
-                                <input type="text" class="form-control" id="investorCity" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">رقم البطاقة الشخصية</label>
-                                <input type="text" class="form-control" id="investorIdCard" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">تاريخ إصدار البطاقة</label>
-                                <input type="date" class="form-control" id="investorIdCardDate">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">المهنة</label>
-                                <input type="text" class="form-control" id="investorOccupation">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">ملاحظات</label>
-                                <textarea class="form-control" id="investorNotes" rows="3"></textarea>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-tab-content" id="investmentInfo">
-                    <form id="initialInvestmentForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">المبلغ (دينار عراقي)</label>
-                                <input type="number" class="form-control" id="initialInvestmentAmount" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">تاريخ الاستثمار</label>
-                                <input type="date" class="form-control" id="initialInvestmentDate" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">طريقة الدفع</label>
-                                <select class="form-select" id="initialInvestmentMethod">
-                                    <option value="cash">نقداً</option>
-                                    <option value="check">شيك</option>
-                                    <option value="transfer">حوالة بنكية</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">رقم المرجع</label>
-                                <input type="text" class="form-control" id="initialInvestmentReference">
-                                <p class="form-text">رقم الشيك أو رقم الحوالة إن وجد</p>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">الربح الشهري المتوقع</label>
-                            <input type="text" class="form-control" id="initialExpectedProfit" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">ملاحظات</label>
-                            <textarea class="form-control" id="initialInvestmentNotes" rows="3"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-tab-content" id="documents">
-                    <div class="form-group">
-                        <label class="form-label">صورة البطاقة الشخصية</label>
-                        <input type="file" class="form-control" id="investorIdCardImage">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">عقد الاستثمار</label>
-                        <input type="file" class="form-control" id="investmentContractFile">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">مستندات إضافية</label>
-                        <input type="file" class="form-control" id="additionalDocuments" multiple>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-light" onclick="closeModal('addInvestorModal')">إلغاء</button>
-                <button class="btn btn-primary" onclick="saveInvestor()">حفظ المستثمر</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- New Investment Modal -->
-    <div class="modal-overlay" id="newInvestmentModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 class="modal-title">استثمار جديد</h2>
-                <div class="modal-close" onclick="closeModal('newInvestmentModal')">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-            <div class="modal-body">
-                <form id="newInvestmentForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">المستثمر</label>
-                            <select class="form-select" id="investmentInvestor" required>
-                                <option value="">اختر المستثمر</option>
-                                <!-- Will be populated by JavaScript -->
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">المبلغ (دينار عراقي)</label>
-                            <input type="number" class="form-control" id="investmentAmount" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">تاريخ الاستثمار</label>
-                            <input type="date" class="form-control" id="investmentDate" required>
-                            <div id="daysMessage" class="form-text" style="color: var(--warning-color);"></div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">طريقة الدفع</label>
-                            <select class="form-select" id="investmentMethod">
-                                <option value="cash">نقداً</option>
-                                <option value="check">شيك</option>
-                                <option value="transfer">حوالة بنكية</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">رقم المرجع</label>
-                            <input type="text" class="form-control" id="investmentReference">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">الربح الشهري المتوقع</label>
-                            <input type="text" class="form-control" id="expectedProfit" readonly>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">ملاحظات</label>
-                        <textarea class="form-control" id="investmentNotes" rows="3"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-light" onclick="closeModal('newInvestmentModal')">إلغاء</button>
-                <button class="btn btn-primary" onclick="saveInvestment()">تأكيد الاستثمار</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Withdraw Modal -->
-    <div class="modal-overlay" id="withdrawModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 class="modal-title">سحب مبلغ</h2>
-                <div class="modal-close" onclick="closeModal('withdrawModal')">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-            <div class="modal-body">
-                <form id="withdrawForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">المستثمر</label>
-                            <select class="form-select" id="withdrawInvestor" required>
-                                <option value="">اختر المستثمر</option>
-                                <!-- Will be populated by JavaScript -->
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">الاستثمار</label>
-                            <select class="form-select" id="withdrawInvestment" required>
-                                <option value="">اختر الاستثمار</option>
-                                <!-- Will be populated by JavaScript -->
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">المبلغ المتاح للسحب</label>
-                            <input type="text" class="form-control" id="availableAmount" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">المبلغ المراد سحبه</label>
-                            <input type="number" class="form-control" id="withdrawAmount" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">تاريخ السحب</label>
-                            <input type="date" class="form-control" id="withdrawDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">طريقة السحب</label>
-                            <select class="form-select" id="withdrawMethod">
-                                <option value="cash">نقداً</option>
-                                <option value="check">شيك</option>
-                                <option value="transfer">حوالة بنكية</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="alert alert-warning">
-                        <div class="alert-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <div class="alert-content">
-                            <div class="alert-title">تنبيه</div>
-                            <div class="alert-text">سيتم إلغاء الفائدة الشهرية للمبلغ المسحوب فقط.</div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">ملاحظات</label>
-                        <textarea class="form-control" id="withdrawNotes" rows="3"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-light" onclick="closeModal('withdrawModal')">إلغاء</button>
-                <button class="btn btn-warning" onclick="saveWithdrawal()">تأكيد السحب</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Pay Profit Modal -->
-    <div class="modal-overlay" id="payProfitModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 class="modal-title">دفع أرباح</h2>
-                <div class="modal-close" onclick="closeModal('payProfitModal')">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-            <div class="modal-body">
-                <form id="payProfitForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">المستثمر</label>
-                            <select class="form-select" id="profitInvestor" required>
-                                <option value="">اختر المستثمر</option>
-                                <!-- Will be populated by JavaScript -->
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">الفترة</label>
-                            <select class="form-select" id="profitPeriod" required>
-                                <option value="current">الشهر الحالي</option>
-                                <option value="previous">الشهر السابق</option>
-                                <option value="custom">فترة مخصصة</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row" id="customProfitPeriod" style="display: none;">
-                        <div class="form-group">
-                            <label class="form-label">من تاريخ</label>
-                            <input type="date" class="form-control" id="profitFromDate">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">إلى تاريخ</label>
-                            <input type="date" class="form-control" id="profitToDate">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">إجمالي الأرباح المستحقة</label>
-                            <input type="text" class="form-control" id="dueProfit" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">المبلغ المراد دفعه</label>
-                            <input type="number" class="form-control" id="profitAmount" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">تاريخ الدفع</label>
-                            <input type="date" class="form-control" id="profitDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">طريقة الدفع</label>
-                            <select class="form-select" id="profitMethod">
-                                <option value="cash">نقداً</option>
-                                <option value="check">شيك</option>
-                                <option value="transfer">حوالة بنكية</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">ملاحظات</label>
-                        <textarea class="form-control" id="profitNotes" rows="3"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-light" onclick="closeModal('payProfitModal')">إلغاء</button>
-                <button class="btn btn-primary" onclick="savePayProfit()">تأكيد الدفع</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- View Investor Modal -->
-    <div class="modal-overlay" id="viewInvestorModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 class="modal-title">معلومات المستثمر</h2>
-                <div class="modal-close" onclick="closeModal('viewInvestorModal')">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div class="modal-tabs">
-                    <div class="modal-tab active" onclick="switchModalTab('investorDetails', 'viewInvestorModal')">المعلومات الشخصية</div>
-                    <div class="modal-tab" onclick="switchModalTab('investorInvestments', 'viewInvestorModal')">الاستثمارات</div>
-                    <div class="modal-tab" onclick="switchModalTab('investorOperations', 'viewInvestorModal')">العمليات</div>
-                    <div class="modal-tab" onclick="switchModalTab('investorProfits', 'viewInvestorModal')">الأرباح</div>
-                    <div class="modal-tab" onclick="switchModalTab('investorDocuments', 'viewInvestorModal')">المستندات</div>
-                </div>
-                <div class="modal-tab-content active" id="investorDetails">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-                <div class="modal-tab-content" id="investorInvestments">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-                <div class="modal-tab-content" id="investorOperations">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-                <div class="modal-tab-content" id="investorProfits">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-                <div class="modal-tab-content" id="investorDocuments">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-light" onclick="closeModal('viewInvestorModal')">إغلاق</button>
-                <button class="btn btn-warning" onclick="editInvestor(currentInvestorId)">تعديل</button>
-                <button class="btn btn-primary" onclick="openNewInvestmentModal(currentInvestorId)">استثمار جديد</button>
-            </div>
-        </div>
-    </div>
-
+    <!-- إضافة مكتبات Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js"></script>
+    
     <script>
- 
+        // إعدادات Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGpAHia_wEmrhnmYjrPf1n1TrAzwEMiAI",
+            authDomain: "messageemeapp.firebaseapp.com",
+            databaseURL: "https://messageemeapp-default-rtdb.firebaseio.com",
+            projectId: "messageemeapp",
+            storageBucket: "messageemeapp.appspot.com",
+            messagingSenderId: "255034474844",
+            appId: "1:255034474844:web:5e3b7a6bc4b2fb94cc4199"
+        };
+
+        // تهيئة Firebase
+        let firebaseApp;
+        let firebaseDB;
+        
+        try {
+            if (!firebase.apps.length) {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+            } else {
+                firebaseApp = firebase.app();
+            }
+            firebaseDB = firebase.database();
+            console.log("✅ تم تهيئة Firebase بنجاح");
+        } catch (error) {
+            console.error("❌ خطأ في تهيئة Firebase:", error);
+            createNotification('خطأ', 'فشل في الاتصال بقاعدة البيانات', 'error');
+        }
+
+        // متغيرات عالمية
+        let video = document.getElementById('video');
+        let currentStream;
+        let hasFrontCamera = false;
+        let hasBackCamera = false;
+        let currentFacingMode = 'environment';
+        let flashEnabled = false;
+
+        // بدء الكاميرا
+        async function startCamera() {
+            try {
+                // إظهار قارئ الكاميرا
+                document.getElementById('cameraReader').classList.add('active');
+                document.getElementById('fileUploader').classList.remove('active');
+                
+                // الحصول على قائمة الكاميرات
+                await detectCameras();
+                
+                // بدء تدفق الكاميرا
+                const constraints = {
+                    video: {
+                        facingMode: currentFacingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+                
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = currentStream;
+                
+                // بدء التعرف على رمز QR
+                startQRDetection();
+                
+                // إظهار إشعار
+                createNotification('نجاح', 'تم تشغيل الكاميرا بنجاح', 'success');
+            } catch (error) {
+                console.error("❌ خطأ في الوصول للكاميرا:", error);
+                createNotification('خطأ', 'فشل في الوصول للكاميرا: ' + error.message, 'error');
+            }
+        }
+
+        // إظهار محمل الملفات
+        function showFileUploader() {
+            document.getElementById('cameraReader').classList.remove('active');
+            document.getElementById('fileUploader').classList.add('active');
+            
+            // إيقاف الكاميرا إذا كانت قيد التشغيل
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            
+            // إعداد منطقة السحب والإفلات
+            const fileUploader = document.getElementById('fileUploader');
+            
+            fileUploader.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUploader.classList.add('drag-over');
+            });
+            
+            fileUploader.addEventListener('dragleave', () => {
+                fileUploader.classList.remove('drag-over');
+            });
+            
+            fileUploader.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUploader.classList.remove('drag-over');
+                
+                if (e.dataTransfer.files.length) {
+                    handleFileSelect(e.dataTransfer.files);
+                }
+            });
+        }
+
+        // اكتشاف الكاميرات المتاحة
+        async function detectCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                hasFrontCamera = videoDevices.some(device => 
+                    device.label.toLowerCase().includes('front') || 
+                    device.label.toLowerCase().includes('أمامية') ||
+                    device.label.toLowerCase().includes('selfie'));
+                    
+                hasBackCamera = videoDevices.some(device => 
+                    device.label.toLowerCase().includes('back') || 
+                    device.label.toLowerCase().includes('خلفية') ||
+                    device.label.toLowerCase().includes('rear'));
+                
+                // إذا كان لدينا كاميرا خلفية، فاستخدمها افتراضياً
+                if (hasBackCamera) {
+                    currentFacingMode = 'environment';
+                } else if (hasFrontCamera) {
+                    currentFacingMode = 'user';
+                }
+                
+                console.log(`✅ تم اكتشاف ${videoDevices.length} كاميرا. أمامية: ${hasFrontCamera}, خلفية: ${hasBackCamera}`);
+            } catch (error) {
+                console.error("❌ خطأ في اكتشاف الكاميرات:", error);
+            }
+        }
+
+        // تبديل الكاميرا
+        async function switchCamera() {
+            if (!(hasFrontCamera && hasBackCamera)) {
+                createNotification('تنبيه', 'لا يوجد كاميرات متعددة', 'warning');
+                return;
+            }
+            
+            // تبديل الوضع
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            
+            // إعادة تشغيل الكاميرا
+            startCamera();
+        }
+
+        // تبديل الفلاش
+        async function toggleFlash() {
+            try {
+                if (!currentStream) return;
+                
+                const track = currentStream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities();
+                
+                // التحقق من دعم الفلاش
+                if (!capabilities.torch) {
+                    createNotification('تنبيه', 'الكاميرا لا تدعم الفلاش', 'warning');
+                    return;
+                }
+                
+                flashEnabled = !flashEnabled;
+                await track.applyConstraints({
+                    advanced: [{ torch: flashEnabled }]
+                });
+                
+                // تحديث زر الفلاش
+                const flashButton = document.querySelector('#cameraControls .fa-bolt').parentElement;
+                if (flashEnabled) {
+                    flashButton.style.backgroundColor = '#f39c12';
+                } else {
+                    flashButton.style.backgroundColor = '';
+                }
+            } catch (error) {
+                console.error("❌ خطأ في تبديل الفلاش:", error);
+                createNotification('خطأ', 'فشل في تبديل الفلاش', 'error');
+            }
+        }
+
+        // بدء التعرف على رمز QR
+        function startQRDetection() {
+            if (!video) return;
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            function scan() {
+                if (!video.videoWidth) {
+                    requestAnimationFrame(scan);
+                    return;
+                }
+                
+                // ضبط حجم الـ canvas ليتطابق مع حجم الفيديو
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // رسم إطار من الفيديو على الـ canvas
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // الحصول على بيانات الصورة
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // التعرف على رمز QR باستخدام jsQR
+                if (typeof jsQR === 'function') {
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+                    
+                    if (code) {
+                        // وجدنا رمز QR
+                        console.log("✅ تم التعرف على رمز QR:", code.data);
+                        
+                        // اهتزاز للإشارة إلى النجاح
+                        if (navigator.vibrate) {
+                            navigator.vibrate([100, 50, 100]);
+                        }
+                        
+                        // معالجة البيانات
+                        handleScannedData(code.data);
+                        
+                        // إيقاف الكاميرا
+                        if (currentStream) {
+                            currentStream.getTracks().forEach(track => track.stop());
+                            currentStream = null;
+                        }
+                        
+                        return;
+                    }
+                }
+                
+                // استمرار المسح ما دامت الكاميرا تعمل
+                if (currentStream) {
+                    requestAnimationFrame(scan);
+                }
+            }
+            
+            scan();
+        }
+
+        // معالجة ملف تم اختياره
+        function handleFileSelect(files) {
+            if (!files || !files.length) return;
+            
+            const file = files[0];
+            
+            // التحقق من أن الملف هو صورة
+            if (!file.type.startsWith('image/')) {
+                createNotification('خطأ', 'الرجاء اختيار ملف صورة', 'error');
+                return;
+            }
+            
+            // إظهار رسالة التحميل
+            document.getElementById('loadingMessage').style.display = 'flex';
+            
+            // إخفاء الرسائل الأخرى
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('results').classList.remove('active');
+            
+            // قراءة الملف
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                try {
+                    const img = new Image();
+                    
+                    img.onload = () => {
+                        // إنشاء canvas لمعالجة الصورة
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // ضبط حجم الـ canvas ليتطابق مع حجم الصورة
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        
+                        // رسم الصورة على الـ canvas
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        
+                        // الحصول على بيانات الصورة
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        
+                        // التعرف على رمز QR باستخدام jsQR
+                        if (typeof jsQR === 'function') {
+                            const code = jsQR(imageData.data, imageData.width, imageData.height);
+                            
+                            if (code) {
+                                // وجدنا رمز QR
+                                console.log("✅ تم التعرف على رمز QR من الصورة:", code.data);
+                                
+                                // إخفاء رسالة التحميل
+                                document.getElementById('loadingMessage').style.display = 'none';
+                                
+                                // معالجة البيانات
+                                handleScannedData(code.data);
+                            } else {
+                                throw new Error('لم يتم العثور على رمز QR في الصورة');
+                            }
+                        } else {
+                            throw new Error('مكتبة jsQR غير متاحة');
+                        }
+                    };
+                    
+                    img.onerror = () => {
+                        throw new Error('فشل في تحميل الصورة');
+                    };
+                    
+                    img.src = e.target.result;
+                } catch (error) {
+                    console.error("❌ خطأ في قراءة الصورة:", error);
+                    
+                    // إخفاء رسالة التحميل وإظهار رسالة الخطأ
+                    document.getElementById('loadingMessage').style.display = 'none';
+                    document.getElementById('errorMessage').style.display = 'flex';
+                    document.getElementById('errorMessage').querySelector('span').textContent = `حدث خطأ: ${error.message}`;
+                    
+                    // إظهار إشعار
+                    createNotification('خطأ', `فشل في قراءة الصورة: ${error.message}`, 'error');
+                }
+            };
+            
+            reader.onerror = () => {
+                console.error("❌ خطأ في قراءة الملف");
+                
+                // إخفاء رسالة التحميل وإظهار رسالة الخطأ
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('errorMessage').style.display = 'flex';
+                
+                // إظهار إشعار
+                createNotification('خطأ', 'فشل في قراءة الملف', 'error');
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        // معالجة البيانات الممسوحة
+        function handleScannedData(data) {
+            try {
+                console.log("⏳ جاري معالجة البيانات الممسوحة:", data);
+                
+                // تحليل البيانات
+                const cardData = JSON.parse(data);
+                
+                // التحقق من صحة البيانات - دعم كل من التنسيق القديم والجديد
+                let cardId = cardData.cardId || cardData.id;
+                let investorId = cardData.investorId || cardData.inv;
+                let cardNumber = cardData.cardNumber || cardData.num;
+                let cardType = cardData.cardType || cardData.t;
+                let expiryDate = cardData.expiryDate || cardData.exp;
+                let status = cardData.status || cardData.s;
+                
+                if (!cardId || !investorId) {
+                    throw new Error('بيانات البطاقة غير صالحة');
+                }
+                
+                // التحقق من البيانات في Firebase إذا كان متاحاً
+                if (firebaseDB) {
+                    getCardFromFirebase(cardId, investorId).then(firebaseData => {
+                        if (firebaseData) {
+                            // استخدام بيانات Firebase
+                            displayCardDetails({
+                                ...cardData,
+                                ...firebaseData,
+                                cardId: cardId || firebaseData.id,
+                                investorId: investorId || firebaseData.investorId,
+                                cardNumber: cardNumber || firebaseData.number,
+                                cardType: cardType || firebaseData.type,
+                                expiryDate: expiryDate || firebaseData.expiry,
+                                status: status || firebaseData.status
+                            });
+                        } else {
+                            // استخدام البيانات المحلية
+                            displayCardDetails(cardData);
+                        }
+                    }).catch(error => {
+                        console.error("❌ خطأ في الحصول على بيانات Firebase:", error);
+                        // استخدام البيانات المحلية
+                        displayCardDetails(cardData);
+                    });
+                } else {
+                    // استخدام البيانات المحلية
+                    displayCardDetails(cardData);
+                }
+                
+                // إظهار إشعار
+                createNotification('نجاح', 'تم التعرف على البطاقة بنجاح', 'success');
+            } catch (error) {
+                console.error('❌ خطأ في معالجة البيانات الممسوحة:', error);
+                
+                // إخفاء رسالة التحميل وإظهار رسالة الخطأ
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('errorMessage').style.display = 'flex';
+                document.getElementById('errorMessage').querySelector('span').textContent = `حدث خطأ: ${error.message}`;
+                
+                // إظهار إشعار
+                createNotification('خطأ', `فشل في معالجة البيانات: ${error.message}`, 'error');
+            }
+        }
+
+        // الحصول على بيانات البطاقة من Firebase
+        async function getCardFromFirebase(cardId, investorId) {
+            try {
+                // البحث في مسار cards
+                const cardSnapshot = await firebaseDB.ref(`cards/${cardId}`).once('value');
+                let cardData = cardSnapshot.val();
+                
+                if (!cardData) {
+                    // البحث في مسار investorCards
+                    const invCardSnapshot = await firebaseDB.ref(`investorCards/${cardId}`).once('value');
+                    cardData = invCardSnapshot.val();
+                }
+                
+                if (cardData) {
+                    // البحث عن بيانات المستثمر
+                    const investorSnapshot = await firebaseDB.ref(`investors/${investorId}`).once('value');
+                    const investorData = investorSnapshot.val();
+                    
+                    if (investorData) {
+                        return {
+                            ...cardData,
+                            investor: investorData
+                        };
+                    }
+                    
+                    return cardData;
+                }
+                
+                return null;
+            } catch (error) {
+                console.error("❌ خطأ في الحصول على بيانات Firebase:", error);
+                return null;
+            }
+        }
+
+        // الحصول على معلومات مفصلة
+        function getDetailedInfo() {
+            // هذه الوظيفة يمكن استخدامها للحصول على معلومات أكثر تفصيلاً
+            // مثل المعاملات الأخيرة، تفاصيل الاستثمار، إلخ
+            createNotification('معلومات', 'جاري الحصول على معلومات مفصلة...', 'info');
+            
+            // يمكن إضافة المزيد من الوظائف هنا للحصول على بيانات من Firebase
+        }
+
+        // عرض تفاصيل البطاقة
+        function displayCardDetails(cardData) {
+            console.log("⏳ جاري عرض تفاصيل البطاقة:", cardData);
+            
+            // الحصول على البيانات
+            const cardId = cardData.cardId || cardData.id;
+            const cardNumber = cardData.cardNumber || cardData.num;
+            const cardType = cardData.cardType || cardData.t;
+            const expiryDate = cardData.expiryDate || cardData.exp;
+            const investorId = cardData.investorId || cardData.inv;
+            const investorName = cardData.investorName || cardData.investor?.name || 'غير معروف';
+            
+            // تحديث عناصر واجهة المستخدم
+            document.getElementById('cardId').textContent = cardId;
+            document.getElementById('cardNumber').textContent = formatCardNumber(cardNumber);
+            document.getElementById('cardType').textContent = getCardTypeName(cardType);
+            document.getElementById('cardExpiry').textContent = formatExpiry(expiryDate);
+            document.getElementById('investorId').textContent = investorId;
+            document.getElementById('investorName').textContent = investorName;
+            
+            // إنشاء معاينة البطاقة
+            const cardPreview = document.getElementById('cardPreview');
+            cardPreview.className = `investor-card ${cardType}`;
+            cardPreview.innerHTML = `
+                <div class="card-shimmer"></div>
+                <div class="card-content">
+                    <div class="card-header">
+                        <div class="card-logo">
+                            <div style="font-size: 12px; font-weight: bold; color: #333; display: flex; 
+                                        flex-direction: column; align-items: center; justify-content: center; 
+                                        height: 100%; width: 100%;">
+                                <i class="fas fa-landmark" style="font-size: 16px; margin-bottom: 2px;"></i>
+                                <span>IIB</span>
+                            </div>
+                        </div>
+                        <div class="card-chip-container">
+                            <div class="card-chip">
+                                <div class="chip-lines"></div>
+                            </div>
+                        </div>
+                        <div class="card-type-icon">
+                            <i class="fas fa-${cardType === 'platinum' ? 'gem' : cardType === 'gold' ? 'crown' : 'star'}"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="card-qr-container">
+                        <div style="width: 80px; height: 80px; background: #fff; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-qrcode" style="font-size: 50px; color: #333;"></i>
+                        </div>
+                        <div class="card-nfc-indicator">
+                            <i class="fas fa-wifi"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="card-number">${formatCardNumber(cardNumber)}</div>
+                    
+                    <div class="card-details">
+                        <div class="card-holder">
+                            <div class="card-label">CARD HOLDER</div>
+                            <div class="card-value">${investorName.toUpperCase()}</div>
+                        </div>
+                        <div class="card-expiry">
+                            <div class="card-label">VALID THRU</div>
+                            <div class="card-value">${formatExpiry(expiryDate)}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <div class="card-bank-name">بنك الاستثمار العراقي</div>
+                        <div class="card-type-name">${getCardTypeName(cardType).toUpperCase()}</div>
+                    </div>
+                </div>
+            `;
+            
+            // إضافة معلومات إضافية إذا كانت متاحة
+            let additionalInfoHTML = '';
+            
+            // معلومات الاستثمار
+            if (cardData.investmentData || cardData.totalInvestment) {
+                const totalInvestment = cardData.investmentData?.totalInvestment || cardData.totalInvestment || 0;
+                const totalProfit = cardData.investmentData?.totalProfit || cardData.totalProfit || 0;
+                
+                additionalInfoHTML += `
+                    <h3>معلومات الاستثمار</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>إجمالي الاستثمار</label>
+                            <div>${formatCurrency(totalInvestment)}</div>
+                        </div>
+                        <div class="info-item">
+                            <label>إجمالي الأرباح</label>
+                            <div>${formatCurrency(totalProfit)}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // معلومات البطاقة الإضافية
+            if (cardData.limits) {
+                additionalInfoHTML += `
+                    <h3>حدود البطاقة</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>الحد اليومي</label>
+                            <div>${formatCurrency(cardData.limits.dailyLimit)}</div>
+                        </div>
+                        <div class="info-item">
+                            <label>الحد الشهري</label>
+                            <div>${formatCurrency(cardData.limits.monthlyLimit)}</div>
+                        </div>
+                        <div class="info-item">
+                            <label>حد السحب</label>
+                            <div>${formatCurrency(cardData.limits.withdrawalLimit)}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // مزايا البطاقة
+            if (cardData.features) {
+                additionalInfoHTML += `
+                    <h3>مزايا البطاقة</h3>
+                    <div class="info-grid">
+                `;
+                
+                if (cardData.features.profitBonus) {
+                    additionalInfoHTML += `
+                        <div class="info-item">
+                            <label>مكافأة أرباح إضافية</label>
+                            <div>${cardData.features.profitBonus}%</div>
+                        </div>
+                    `;
+                }
+                
+                if (cardData.features.freeTransactions) {
+                    additionalInfoHTML += `
+                        <div class="info-item">
+                            <label>معاملات مجانية</label>
+                            <div>${cardData.features.freeTransactions === -1 ? 'غير محدودة' : cardData.features.freeTransactions}</div>
+                        </div>
+                    `;
+                }
+                
+                if (cardData.features.prioritySupport) {
+                    additionalInfoHTML += `
+                        <div class="info-item">
+                            <label>دعم ذو أولوية</label>
+                            <div><i class="fas fa-check" style="color: var(--secondary-color);"></i></div>
+                        </div>
+                    `;
+                }
+                
+                if (cardData.features.vipAccess) {
+                    additionalInfoHTML += `
+                        <div class="info-item">
+                            <label>خدمات VIP</label>
+                            <div><i class="fas fa-check" style="color: var(--secondary-color);"></i></div>
+                        </div>
+                    `;
+                }
+                
+                if (cardData.features.insurance) {
+                    additionalInfoHTML += `
+                        <div class="info-item">
+                            <label>تأمين على المعاملات</label>
+                            <div><i class="fas fa-check" style="color: var(--secondary-color);"></i></div>
+                        </div>
+                    `;
+                }
+                
+                additionalInfoHTML += `
+                    </div>
+                `;
+            }
+            
+            // معلومات النظام
+            additionalInfoHTML += `
+                <h3>معلومات النظام</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>حالة البطاقة</label>
+                        <div class="status ${cardData.status || 'active'}">${cardData.status === 'suspended' ? 'متوقفة' : 'نشطة'}</div>
+                    </div>
+                    <div class="info-item">
+                        <label>آخر تحديث</label>
+                        <div>${formatDate(cardData.lastSync || cardData.updatedAt || cardData.timestamp || new Date().toISOString())}</div>
+                    </div>
+                </div>
+            `;
+            
+            // إضافة المعلومات الإضافية
+            document.getElementById('additionalInfo').innerHTML = additionalInfoHTML;
+            
+            // إظهار النتائج
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('results').classList.add('active');
+        }
+
+        // إعادة المسح
+        function scanAgain() {
+            // إخفاء النتائج
+            document.getElementById('results').classList.remove('active');
+            document.getElementById('errorMessage').style.display = 'none';
+            
+            // إظهار قارئ البطاقة
+            document.getElementById('cameraReader').classList.remove('active');
+            document.getElementById('fileUploader').classList.remove('active');
+            
+            // إعادة تعيين واجهة المستخدم
+            document.getElementById('cameraReader').classList.remove('active');
+            document.getElementById('fileUploader').classList.remove('active');
+            
+            // استخدام الكاميرا تلقائياً
+            startCamera();
+        }
+
+        // إنشاء إشعار
+        function createNotification(title, message, type = 'info') {
+            // التحقق من وجود div الإشعارات
+            let notificationsContainer = document.getElementById('notifications-container');
+            
+            if (!notificationsContainer) {
+                notificationsContainer = document.createElement('div');
+                notificationsContainer.id = 'notifications-container';
+                document.body.appendChild(notificationsContainer);
+            }
+            
+            // إنشاء الإشعار
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: flex-start;">
+                    <div style="margin-left: 10px; color: var(--${type === 'success' ? 'secondary' : type}-color);">
+                        <i class="fas fa-${
+                            type === 'success' ? 'check-circle' : 
+                            type === 'warning' ? 'exclamation-triangle' : 
+                            type === 'error' ? 'exclamation-circle' : 
+                            'info-circle'
+                        }" style="font-size: 18px;"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style="margin: 0 0 5px; font-size: 16px;">${title}</h4>
+                        <p style="margin: 0; font-size: 14px; opacity: 0.8;">${message}</p>
+                    </div>
+                    <button style="background: none; border: none; cursor: pointer; font-size: 16px; color: #999; margin-right: 5px;" onclick="this.parentElement.parentElement.remove()">
+                        &times;
+                    </button>
+                </div>
+                <div class="notification-progress" style="position: absolute; bottom: 0; right: 0; height: 3px; width: 100%; background-color: var(--${type === 'success' ? 'secondary' : type}-color); opacity: 0.7;"></div>
+            `;
+            
+            // إضافة الإشعار إلى الحاوية
+            notificationsContainer.appendChild(notification);
+            
+            // إظهار الإشعار
+            setTimeout(() => {
+                notification.classList.add('show');
+                
+                // إخفاء الإشعار بعد 5 ثوانٍ
+                const progressBar = notification.querySelector('.notification-progress');
+                progressBar.style.width = '0';
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 300);
+                }, 5000);
+            }, 10);
+        }
+
+        // تنسيق رقم البطاقة
+        function formatCardNumber(number) {
+            if (!number) return '-';
+            return number.replace(/(\d{4})/g, '$1 ').trim();
+        }
+
+        // تنسيق تاريخ الانتهاء
+        function formatExpiry(date) {
+            if (!date) return '-';
+            
+            if (date.includes('-')) {
+                const parts = date.split('-');
+                return `${parts[1]}/${parts[0].substring(2)}`;
+            }
+            
+            return date;
+        }
+
+        // الحصول على اسم نوع البطاقة
+        function getCardTypeName(type) {
+            switch (type) {
+                case 'platinum': return 'بلاتينية';
+                case 'gold': return 'ذهبية';
+                case 'premium': return 'بريميوم';
+                default: return type || 'قياسية';
+            }
+        }
+
+        // تنسيق المبلغ
+        function formatCurrency(amount, short = false) {
+            if (amount === undefined || amount === null) return '-';
+            
+            amount = Number(amount);
+            
+            if (isNaN(amount)) return '-';
+            
+            if (short && amount >= 1000000) {
+                return `${(amount / 1000000).toFixed(1)} مليون`;
+            }
+            
+            return new Intl.NumberFormat('ar-IQ', {
+                style: 'currency',
+                currency: 'IQD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // تنسيق التاريخ
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            
+            try {
+                const date = new Date(dateString);
+                
+                if (isNaN(date.getTime())) return dateString;
+                
+                const options = { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' };
+                return new Intl.DateTimeFormat('ar-IQ', options).format(date);
+            } catch (error) {
+                return dateString;
+            }
+        }
+
+        // بدء التطبيق
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("✅ تم تحميل التطبيق بنجاح");
+            
+            // التحقق من دعم كاميرا الويب
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.warn("⚠️ الكاميرا غير مدعومة في هذا المتصفح");
+                
+                // إخفاء زر الكاميرا
+                document.querySelector('.option-btn.camera').style.display = 'none';
+                
+                // إظهار محمل الملفات تلقائياً
+                showFileUploader();
+            }
+            
+            // التحقق من دعم مكتبة jsQR
+            if (typeof jsQR !== 'function') {
+                console.warn("⚠️ مكتبة jsQR غير متاحة");
+                
+                // تحميل مكتبة jsQR
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+                document.head.appendChild(script);
+            }
+        });
     </script>
 </body>
 </html>
