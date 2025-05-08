@@ -321,7 +321,9 @@ function updateCardPreview() {
                 </div>
                 
                 <div class="card-qr-container">
-                    <canvas id="preview-qr" width="80" height="80"></canvas>
+                    <div style="width: 80px; height: 80px; background: #fff; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-qrcode" style="font-size: 50px; color: #333;"></i>
+                    </div>
                     <div class="card-nfc-indicator">
                         <i class="fas fa-wifi"></i>
                     </div>
@@ -355,14 +357,6 @@ function updateCardPreview() {
             option.classList.add('selected');
         }
     });
-    
-    // إنشاء QR Code للمعاينة
-    setTimeout(() => {
-        const canvas = document.getElementById('preview-qr');
-        if (canvas) {
-            generateCardQRCode(canvas, tempCard, investor);
-        }
-    }, 100);
 }
 
 // إنشاء بطاقة جديدة
@@ -445,301 +439,150 @@ function getCardFeatures(cardType) {
 }
 
 // ===============================================================
-// SECTION 3: وظائف رمز QR والباركود - محسنة
+// SECTION 3: وظائف رمز QR والباركود
 // ===============================================================
 
-// توليد رمز QR للبطاقة - محسن جداً
+// توليد رمز QR للبطاقة - محسن
 function generateCardQRCode(canvas, card, investor) {
     try {
         if (!canvas) return;
         
-        // تنظيف القماش من العناصر السابقة
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // إنشاء بيانات مختصرة للحد من حجم QR Code
-        const cardData = createCardDataV2(card, investor);
+        // إنشاء بيانات البطاقة
+        const cardData = createCardData(card, investor);
         
         // التحقق من وجود مكتبة QRCode
-        if (typeof QRCode === 'function') {
+        if (window.QRCode) {
             try {
-                // مسح أي عناصر سابقة في الـ canvas
-                while (canvas.firstChild) {
-                    canvas.removeChild(canvas.firstChild);
-                }
-                
-                // استخدام مكتبة QRCode.js مع إعدادات محسنة
+                // استخدام مكتبة QRCode.js
                 new QRCode(canvas, {
                     text: cardData,
                     width: canvas.width,
                     height: canvas.height,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H,  // مستوى تصحيح عالي للقراءة الأفضل
-                    quietZone: 5  // منطقة هادئة حول الرمز
+                    correctLevel: QRCode.CorrectLevel.M  // استخدام مستوى تصحيح أقل للسماح بمزيد من البيانات
                 });
-                
-                console.log(`✅ تم إنشاء رمز QR للبطاقة ${card.id}`);
-                return;
             } catch (qrError) {
                 console.warn("⚠️ خطأ في مكتبة QRCode:", qrError);
-                // محاولة تحميل مكتبة QRCode ديناميكياً
-                loadQRCodeLibrary(canvas, card, investor);
-                return;
+                // في حالة الفشل، استخدم بيانات أبسط
+                const simpleData = JSON.stringify({
+                    id: card.id,
+                    inv: investor.id
+                });
+                
+                try {
+                    new QRCode(canvas, {
+                        text: simpleData,
+                        width: canvas.width,
+                        height: canvas.height,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.L  // مستوى تصحيح منخفض للبيانات البسيطة
+                    });
+                } catch (e) {
+                    // إذا فشل أيضاً، استخدم رسم QR مبسط
+                    drawSimpleQRCode(canvas, simpleData);
+                }
             }
         } else {
-            // محاولة تحميل مكتبة QRCode
-            loadQRCodeLibrary(canvas, card, investor);
-            return;
+            // استخدام رمز QR مبسط
+            drawSimpleQRCode(canvas, cardData);
         }
+        
+        console.log(`✅ تم إنشاء رمز QR للبطاقة ${card.id}`);
     } catch (error) {
         console.error("❌ خطأ في إنشاء رمز QR:", error);
-        // في حالة الفشل، استخدم رسم QR بسيط
-        drawSimpleQRCode(canvas, JSON.stringify({id: card.id, i: card.investorId}));
+        drawSimpleQRCode(canvas, JSON.stringify({id: card.id}));
     }
 }
 
-// إنشاء بيانات البطاقة للـ QR Code - بتنسيق محسن
-function createCardDataV2(card, investor) {
-    // بيانات متوافقة مع المعايير الحديثة
-    const data = {
-        v: "2.0",                  // إصدار البيانات
-        id: card.id,               // معرف البطاقة
-        n: card.number,            // رقم البطاقة (مختصر)
-        i: card.investorId,        // معرف المستثمر
-        in: investor?.name,        // اسم المستثمر
-        t: card.type,              // نوع البطاقة
-        e: card.expiry,            // تاريخ الانتهاء
-        s: card.status,            // الحالة
-        b: "IIB",                  // رمز البنك
-        c: generateCardChecksum(card) // التحقق من السلامة
-    };
-    
-    // تحويل إلى JSON مختصر
-    return JSON.stringify(data);
-}
-
-// تحميل مكتبة QRCode ديناميكياً
-function loadQRCodeLibrary(canvas, card, investor) {
-    console.log("⚠️ جاري تحميل مكتبة QRCode...");
-    
-    // التحقق من عدم وجود العنصر بالفعل
-    if (document.getElementById('qrcode-script')) {
-        // محاولة رسم QR بسيط بدلاً من ذلك
-        drawSimpleQRCode(canvas, createCardDataV2(card, investor));
-        return;
-    }
-    
-    // إنشاء عنصر البرنامج النصي
-    const script = document.createElement('script');
-    script.id = 'qrcode-script';
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-    script.async = true;
-    
-    // عند اكتمال التحميل
-    script.onload = function() {
-        console.log("✅ تم تحميل مكتبة QRCode بنجاح");
-        generateCardQRCode(canvas, card, investor);
-    };
-    
-    // عند فشل التحميل
-    script.onerror = function() {
-        console.error("❌ فشل تحميل مكتبة QRCode");
-        // استخدام طريقة النسخ الاحتياطي
-        drawSimpleQRCode(canvas, createCardDataV2(card, investor));
-    };
-    
-    // إضافة البرنامج النصي إلى الصفحة
-    document.head.appendChild(script);
-}
-
-// رسم رمز QR بسيط (محسن بشكل كبير)
+// رسم رمز QR بسيط (احتياطي)
 function drawSimpleQRCode(canvas, dataString = '') {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     const size = canvas.width;
     
-    // حساب قيمة تجزئة من سلسلة البيانات
+    // خلفية بيضاء
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    
+    // إنشاء هاش من سلسلة البيانات لإنشاء نمط متناسق
     let hash = 0;
     if (dataString) {
         for (let i = 0; i < dataString.length; i++) {
             hash = ((hash << 5) - hash) + dataString.charCodeAt(i);
             hash |= 0; // تحويل إلى عدد صحيح 32 بت
         }
-    } else {
-        // استخدام قيمة عشوائية إذا لم تكن هناك بيانات
-        hash = Math.floor(Math.random() * 1000000);
     }
     
-    // تحديد عدد الخلايا استناداً إلى حجم الـ canvas
-    const cells = Math.max(21, Math.min(40, Math.floor(size / 5)));
+    // إنشاء شبكة
+    const cells = 6;
     const cellSize = size / cells;
+    const padding = cellSize * 0.2;
     
-    // خلفية بيضاء
+    // رسم الخلايا بناءً على الهاش أو عشوائي إذا لم يكن هناك هاش
+    ctx.fillStyle = '#000000';
+    
+    // رسم أنماط الباحث (مثل رموز QR الحقيقية)
+    // أعلى اليسار
+    ctx.fillRect(padding, padding, cellSize * 2 - padding * 2, cellSize * 2 - padding * 2);
+    // أعلى اليمين
+    ctx.fillRect(size - cellSize * 2 + padding, padding, cellSize * 2 - padding * 2, cellSize * 2 - padding * 2);
+    // أسفل اليسار
+    ctx.fillRect(padding, size - cellSize * 2 + padding, cellSize * 2 - padding * 2, cellSize * 2 - padding * 2);
+    
+    // رسم المربعات البيضاء الداخلية في أنماط الباحث
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
+    // أعلى اليسار
+    ctx.fillRect(padding + cellSize * 0.5, padding + cellSize * 0.5, cellSize - padding, cellSize - padding);
+    // أعلى اليمين
+    ctx.fillRect(size - cellSize * 1.5, padding + cellSize * 0.5, cellSize - padding, cellSize - padding);
+    // أسفل اليسار
+    ctx.fillRect(padding + cellSize * 0.5, size - cellSize * 1.5, cellSize - padding, cellSize - padding);
     
-    // رسم خلفية شبكية خفيفة
-    ctx.fillStyle = '#f9f9f9';
-    for (let i = 0; i < cells; i += 2) {
-        for (let j = 0; j < cells; j += 2) {
-            ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
-        }
-    }
-    
-    // رسم أنماط المحاذاة
-    const positionPatterns = [
-        {x: 0, y: 0},                     // أعلى اليسار
-        {x: cells - 7, y: 0},              // أعلى اليمين
-        {x: 0, y: cells - 7}               // أسفل اليسار
-    ];
-    
-    // رسم أنماط المحاذاة
-    for (const pattern of positionPatterns) {
-        drawPositionPattern(ctx, pattern.x * cellSize, pattern.y * cellSize, 7 * cellSize);
-    }
-    
-    // إنشاء مولد عشوائي مبني على التجزئة
-    const rand = createPseudoRandom(hash);
-    
-    // رسم نمط التوقيت
-    drawTimingPattern(ctx, cells, cellSize);
-    
-    // رسم البيانات
-    drawDataPattern(ctx, cells, cellSize, rand, positionPatterns);
-    
-    // رسم نمط المحاذاة في الوسط (للرموز الأكبر)
-    if (cells >= 25) {
-        // نمط محاذاة في المنتصف (تقريباً)
-        drawAlignmentPattern(ctx, Math.floor(cells/2) * cellSize, Math.floor(cells/2) * cellSize, 5 * cellSize);
-    }
-}
-
-// رسم نمط محاذاة QR (الأنماط المربعة في الزوايا)
-function drawPositionPattern(ctx, x, y, size) {
-    const blockSize = size / 7;
-    
-    // الإطار الخارجي
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x, y, size, size);
-    
-    // الحلقة البيضاء
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(x + blockSize, y + blockSize, size - 2 * blockSize, size - 2 * blockSize);
-    
-    // المربع الأوسط
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x + 2 * blockSize, y + 2 * blockSize, size - 4 * blockSize, size - 4 * blockSize);
-}
-
-// رسم نمط التوقيت (الخطوط المتقطعة بين أنماط المحاذاة)
-function drawTimingPattern(ctx, cells, cellSize) {
-    ctx.fillStyle = "#000000";
-    
-    // النمط الأفقي
-    for (let i = 8; i < cells - 8; i++) {
-        if (i % 2 === 0) {
-            ctx.fillRect(i * cellSize, 6 * cellSize, cellSize, cellSize);
-            ctx.fillRect(6 * cellSize, i * cellSize, cellSize, cellSize);
-        }
-    }
-}
-
-// رسم نمط محاذاة إضافي (النقاط الصغيرة في الرموز الكبيرة)
-function drawAlignmentPattern(ctx, x, y, size) {
-    const blockSize = size / 5;
-    
-    // الإطار الخارجي
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x - size/2, y - size/2, size, size);
-    
-    // الحلقة البيضاء
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(x - size/2 + blockSize, y - size/2 + blockSize, size - 2 * blockSize, size - 2 * blockSize);
-    
-    // النقطة المركزية
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x - blockSize/2, y - blockSize/2, blockSize, blockSize);
-}
-
-// رسم نمط البيانات (الخلايا السوداء والبيضاء التي تمثل البيانات)
-function drawDataPattern(ctx, cells, cellSize, rand, positionPatterns) {
-    ctx.fillStyle = "#000000";
-    
-    // إنشاء مجموعة لتتبع المواضع المحجوزة
-    const reservedCells = new Set();
-    
-    // إضافة مواقع أنماط المحاذاة إلى المواقع المحجوزة
-    for (const pattern of positionPatterns) {
-        for (let i = 0; i < 7; i++) {
-            for (let j = 0; j < 7; j++) {
-                reservedCells.add(`${pattern.x + j},${pattern.y + i}`);
-            }
-        }
-    }
-    
-    // إضافة نمط التوقيت إلى المواقع المحجوزة
+    // رسم خلايا البيانات
+    ctx.fillStyle = '#000000';
     for (let i = 0; i < cells; i++) {
-        reservedCells.add(`${i},6`);
-        reservedCells.add(`6,${i}`);
-    }
-    
-    // إنشاء عدد كافٍ من الخلايا لتشبه رمز QR حقيقي
-    const minDots = Math.floor(cells * cells * 0.3);  // على الأقل 30% من الخلايا
-    const maxDots = Math.floor(cells * cells * 0.4);  // على الأكثر 40% من الخلايا
-    const dotsCount = minDots + Math.floor(rand() * (maxDots - minDots));
-    
-    // توزيع النقاط
-    let dotsPlaced = 0;
-    
-    // إضافة بعض المجموعات لتبدو أكثر واقعية
-    const clusterCount = Math.floor(cells / 5);
-    for (let c = 0; c < clusterCount; c++) {
-        const clusterX = Math.floor(rand() * cells);
-        const clusterY = Math.floor(rand() * cells);
-        const clusterSize = Math.floor(rand() * 5) + 3;
-        
-        for (let i = 0; i < clusterSize; i++) {
-            for (let j = 0; j < clusterSize; j++) {
-                const x = (clusterX + i) % cells;
-                const y = (clusterY + j) % cells;
-                const key = `${x},${y}`;
-                
-                // تخطي الخلايا المحجوزة والشطرنج
-                if (!reservedCells.has(key) && rand() > 0.3) {
-                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-                    reservedCells.add(key);
-                    dotsPlaced++;
-                }
-                
-                if (dotsPlaced >= dotsCount) break;
+        for (let j = 0; j < cells; j++) {
+            // تخطي مناطق نمط الباحث
+            if ((i < 2 && j < 2) || (i < 2 && j >= cells - 2) || (i >= cells - 2 && j < 2)) {
+                continue;
             }
-            if (dotsPlaced >= dotsCount) break;
-        }
-    }
-    
-    // إضافة نقاط إضافية عشوائية
-    while (dotsPlaced < dotsCount) {
-        const x = Math.floor(rand() * cells);
-        const y = Math.floor(rand() * cells);
-        const key = `${x},${y}`;
-        
-        if (!reservedCells.has(key)) {
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-            reservedCells.add(key);
-            dotsPlaced++;
+            
+            // استخدام الهاش أو عشوائي لتحديد ما إذا كان يجب ملء الخلية
+            const shouldFill = dataString ? 
+                ((hash + i * j) % 5 > 2) : 
+                (Math.random() > 0.6);
+                
+            if (shouldFill) {
+                ctx.fillRect(
+                    j * cellSize + padding,
+                    i * cellSize + padding,
+                    cellSize - padding * 2,
+                    cellSize - padding * 2
+                );
+            }
         }
     }
 }
 
-// إنشاء مولد أرقام شبه عشوائية باستخدام بذرة
-function createPseudoRandom(seed) {
-    let value = seed;
-    return function() {
-        value = (value * 1103515245 + 12345) % 2147483647;
-        return value / 2147483647;
+// إنشاء بيانات البطاقة للـ QR Code
+function createCardData(card, investor) {
+    // بيانات مختصرة للحد من حجم QR Code
+    const data = {
+        v: "1.0",                  // الإصدار
+        id: card.id,               // معرف البطاقة
+        num: card.number,          // رقم البطاقة
+        inv: investor.id,          // معرف المستثمر
+        t: card.type,              // نوع البطاقة
+        exp: card.expiry,          // تاريخ الانتهاء
+        s: card.status,            // الحالة
+        url: `inv://${card.id}`    // رابط التطبيق
     };
+    
+    // تحويل البيانات إلى JSON مختصر
+    return JSON.stringify(data);
 }
 
 // إنشاء checksum للبطاقة
@@ -775,17 +618,8 @@ function scanBarcode() {
                 <div id="qr-scanner-container" style="position: relative; width: 100%; height: 400px; overflow: hidden; border-radius: 8px;">
                     <video id="qr-video" style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
                     <div class="scanner-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;">
-                        <div class="scanner-frame" style="width: 250px; height: 250px; border: 3px solid #fff; border-radius: 20px; box-shadow: 0 0 0 100vw rgba(0,0,0,0.5);">
-                            <div class="scan-line" style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(to right, transparent, #3498db, transparent); animation: scan-line 2s linear infinite;"></div>
-                        </div>
+                        <div class="scanner-frame" style="width: 250px; height: 250px; border: 3px solid #fff; border-radius: 20px; box-shadow: 0 0 0 100vw rgba(0,0,0,0.5);"></div>
                     </div>
-                    <style>
-                        @keyframes scan-line {
-                            0% { top: 0; }
-                            50% { top: 250px; }
-                            100% { top: 0; }
-                        }
-                    </style>
                     <div class="camera-selection" style="position: absolute; top: 10px; right: 10px; z-index: 10;">
                         <select id="camera-select" style="padding: 5px; border-radius: 5px; opacity: 0.7;" onchange="switchCamera(this.value)">
                             <option value="">... جاري تحميل الكاميرات</option>
@@ -817,7 +651,6 @@ function scanBarcode() {
 // متغير لتخزين مصدر الفلاش الحالي
 let currentTrack = null;
 let flashlightOn = false;
-let scannerInterval = null;
 
 // تبديل الفلاش
 async function toggleFlashlight() {
@@ -852,18 +685,18 @@ async function switchCamera(deviceId) {
     if (!deviceId) return;
     
     try {
-        if (currentTrack) {
-            currentTrack.stop();
-        }
-        
-        // وقف أي فاصل زمني للمسح
-        if (scannerInterval) {
-            clearInterval(scannerInterval);
-            scannerInterval = null;
-        }
-        
-        // بدء الكاميرا الجديدة
-        await startQRScanner(deviceId);
+        closeBarcodeScanner();
+        setTimeout(() => {
+            scanBarcode();
+            // تعيين الكاميرا المحددة بعد إعادة فتح الماسح
+            setTimeout(() => {
+                const select = document.getElementById('camera-select');
+                if (select) {
+                    select.value = deviceId;
+                }
+                startQRScanner(deviceId);
+            }, 300);
+        }, 300);
     } catch (error) {
         console.error("❌ خطأ في تبديل الكاميرا:", error);
     }
@@ -892,8 +725,7 @@ async function populateCameraSelect() {
         // تحديد الكاميرا الخلفية افتراضياً إن وجدت
         const backCamera = videoDevices.find(device => 
             device.label.toLowerCase().includes('back') || 
-            device.label.toLowerCase().includes('خلفية') ||
-            device.label.toLowerCase().includes('rear')
+            device.label.toLowerCase().includes('خلفية')
         );
         
         if (backCamera) {
@@ -920,9 +752,8 @@ async function startQRScanner(deviceId = null) {
         const constraints = {
             video: {
                 facingMode: "environment", // محاولة استخدام الكاميرا الخلفية افتراضياً
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                frameRate: { ideal: 30 }
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
             }
         };
         
@@ -937,22 +768,6 @@ async function startQRScanner(deviceId = null) {
         
         // حفظ المسار الحالي للتحكم بالفلاش
         currentTrack = stream.getVideoTracks()[0];
-        
-        // التحقق من قدرات الفلاش
-        try {
-            const capabilities = currentTrack.getCapabilities();
-            const hasFlash = capabilities && capabilities.torch;
-            
-            // تحديث زر الفلاش
-            const flashBtn = document.querySelector('.modal-footer .btn-secondary');
-            if (flashBtn) {
-                flashBtn.disabled = !hasFlash;
-                flashBtn.title = hasFlash ? "تشغيل/إيقاف الفلاش" : "الكاميرا لا تدعم الفلاش";
-                flashBtn.style.opacity = hasFlash ? "1" : "0.5";
-            }
-        } catch (e) {
-            console.warn("⚠️ لا يمكن التحقق من قدرات الكاميرا:", e);
-        }
         
         // احصل على قائمة الكاميرات المتاحة
         populateCameraSelect();
@@ -977,17 +792,11 @@ async function startQRScanner(deviceId = null) {
 
 // إعداد فحص QR من الفيديو
 function setupQRScanning(video) {
-    // إيقاف أي فاصل زمني سابق
-    if (scannerInterval) {
-        clearInterval(scannerInterval);
-    }
-    
     // التحقق من وجود مكتبة jsQR
     if (typeof jsQR === 'function') {
-        scannerInterval = setInterval(() => {
+        const scanInterval = setInterval(() => {
             if (!video.srcObject) {
-                clearInterval(scannerInterval);
-                scannerInterval = null;
+                clearInterval(scanInterval);
                 return;
             }
             
@@ -1008,116 +817,44 @@ function setupQRScanning(video) {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             
             // تحليل الصورة بحثاً عن رمز QR
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "dontInvert" // تحسين أداء القراءة
-            });
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
             
             if (code) {
                 // تم العثور على رمز QR
                 handleScannedData(code.data);
-                clearInterval(scannerInterval);
-                scannerInterval = null;
-                
-                // إظهار مؤشر بصري للنجاح
-                const scannerFrame = document.querySelector('.scanner-frame');
-                if (scannerFrame) {
-                    scannerFrame.style.borderColor = '#2ecc71';
-                    scannerFrame.style.boxShadow = '0 0 0 100vw rgba(46, 204, 113, 0.5)';
-                }
-                
-                // اهتزاز للإشارة إلى النجاح
-                if (navigator.vibrate) {
-                    navigator.vibrate([100, 50, 100]);
-                }
+                clearInterval(scanInterval);
             }
         }, 100);
     } else {
-        // محاولة تحميل مكتبة jsQR
-        loadJSQRLibrary(video);
-    }
-}
-
-// تحميل مكتبة jsQR ديناميكياً
-function loadJSQRLibrary(video) {
-    console.log("⚠️ جاري تحميل مكتبة jsQR...");
-    
-    // التحقق من عدم وجود العنصر بالفعل
-    if (document.getElementById('jsqr-script')) {
-        // استخدام طريقة مسح بديلة
-        useFallbackScanner(video);
-        return;
-    }
-    
-    // إنشاء عنصر البرنامج النصي
-    const script = document.createElement('script');
-    script.id = 'jsqr-script';
-    script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-    script.async = true;
-    
-    // عند اكتمال التحميل
-    script.onload = function() {
-        console.log("✅ تم تحميل مكتبة jsQR بنجاح");
-        setupQRScanning(video);
-    };
-    
-    // عند فشل التحميل
-    script.onerror = function() {
-        console.error("❌ فشل تحميل مكتبة jsQR");
-        // استخدام طريقة المسح البديلة
-        useFallbackScanner(video);
-    };
-    
-    // إضافة البرنامج النصي إلى الصفحة
-    document.head.appendChild(script);
-}
-
-// استخدام ماسح بديل عند فشل تحميل المكتبات
-function useFallbackScanner(video) {
-    console.log("⚠️ استخدام ماسح QR بديل");
-    
-    // عرض رسالة في النتيجة
-    const resultElement = document.getElementById('scanner-result');
-    if (resultElement) {
-        resultElement.innerHTML = `
-            <i class="fas fa-info-circle" style="color: var(--info-color);"></i>
-            جاري استخدام ماسح بديل. قد تكون الدقة أقل.
-        `;
-    }
-    
-    // إعداد فاصل زمني للمحاكاة
-    scannerInterval = setInterval(() => {
-        if (!video.srcObject) {
-            clearInterval(scannerInterval);
-            scannerInterval = null;
-            return;
+        // بديل: استخدام ZXing إذا كان متاحاً
+        if (typeof ZXing === 'function') {
+            const codeReader = new ZXing.BrowserQRCodeReader();
+            codeReader.decodeFromVideoElement(video)
+                .then(result => {
+                    handleScannedData(result.text);
+                })
+                .catch(err => console.error("❌ خطأ في قراءة QR:", err));
+        } else {
+            // مكتبة بديلة - استخدام معالجة الصور البسيطة
+            const scanInterval = setInterval(() => {
+                if (!video.srcObject) {
+                    clearInterval(scanInterval);
+                    return;
+                }
+                
+                // تطبيق رصد الباركود محلياً هنا
+                // (هذا مجرد محاكاة، ستحتاج إلى مكتبة فعلية)
+                if (Math.random() < 0.001) { // محاكاة العثور على رمز بشكل عشوائي للأغراض التوضيحية
+                    const mockData = JSON.stringify({
+                        cardId: investorCards.length > 0 ? investorCards[0].id : generateId(),
+                        investorId: investors.length > 0 ? investors[0].id : generateId()
+                    });
+                    handleScannedData(mockData);
+                    clearInterval(scanInterval);
+                }
+            }, 100);
         }
-        
-        // الطريقة البديلة - محاكاة المسح لأغراض العرض
-        // في التطبيق الحقيقي، يمكن استخدام محلل بسيط
-        if (Math.random() < 0.005) { // فرصة صغيرة للنجاح "الظاهري"
-            // اختيار بطاقة عشوائية من القائمة الحالية
-            if (investorCards.length > 0) {
-                const randomIndex = Math.floor(Math.random() * investorCards.length);
-                const card = investorCards[randomIndex];
-                const mockData = JSON.stringify({
-                    id: card.id,
-                    i: card.investorId
-                });
-                handleScannedData(mockData);
-                clearInterval(scannerInterval);
-                scannerInterval = null;
-            } else {
-                // إذا لم تكن هناك بطاقات، توليد معرف عشوائي
-                const mockData = JSON.stringify({
-                    id: generateId(),
-                    i: generateId()
-                });
-                handleScannedData(mockData);
-                clearInterval(scannerInterval);
-                scannerInterval = null;
-            }
-        }
-    }, 100);
+    }
 }
 
 // معالجة البيانات الممسوحة
@@ -1130,9 +867,9 @@ function handleScannedData(data) {
         
         // التحقق من صحة البيانات - دعم كل من التنسيق القديم والجديد
         let cardId = cardData.cardId || cardData.id;
-        let investorId = cardData.investorId || cardData.i;
+        let investorId = cardData.investorId || cardData.inv;
         
-        if (!cardId && !investorId) {
+        if (!cardId || !investorId) {
             throw new Error('بيانات البطاقة غير صالحة');
         }
         
@@ -1174,12 +911,6 @@ function handleScannedData(data) {
                     <i class="fas fa-camera"></i> وجه الكاميرا نحو رمز QR
                 `;
             }
-            
-            // إعادة بدء المسح
-            const video = document.getElementById('qr-video');
-            if (video && video.srcObject) {
-                setupQRScanning(video);
-            }
         }, 3000);
     }
 }
@@ -1190,12 +921,6 @@ function closeBarcodeScanner() {
     if (qrCodeScanner) {
         qrCodeScanner.stop();
         qrCodeScanner = null;
-    }
-    
-    // إيقاف أي فاصل زمني للمسح
-    if (scannerInterval) {
-        clearInterval(scannerInterval);
-        scannerInterval = null;
     }
     
     // إيقاف الكاميرا
@@ -1281,65 +1006,28 @@ async function decodeQRFromImage(file) {
                     
                     // محاولة فك ترميز QR باستخدام jsQR إذا كان متاحاً
                     if (typeof jsQR === 'function') {
-                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                            inversionAttempts: "attemptBoth" // محاولة كلا الطريقتين للحصول على أفضل نتيجة
-                        });
-                        
+                        const code = jsQR(imageData.data, imageData.width, imageData.height);
                         if (code) {
                             resolve(code.data);
                             return;
                         }
                     }
                     
-                    // إذا كانت مكتبة jsQR غير متاحة أو فشلت، حاول تحميل المكتبة
-                    if (typeof jsQR !== 'function') {
-                        // تحميل مكتبة jsQR ديناميكياً
-                        const script = document.createElement('script');
-                        script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-                        
-                        script.onload = () => {
-                            try {
-                                // محاولة مرة أخرى باستخدام المكتبة المحملة
-                                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                                    inversionAttempts: "attemptBoth"
-                                });
-                                
-                                if (code) {
-                                    resolve(code.data);
-                                } else {
-                                    // محاولة عكس الألوان إذا فشلت المحاولة الأولى
-                                    const invertedData = new Uint8ClampedArray(imageData.data.length);
-                                    for (let i = 0; i < imageData.data.length; i += 4) {
-                                        invertedData[i] = 255 - imageData.data[i];         // R
-                                        invertedData[i + 1] = 255 - imageData.data[i + 1]; // G
-                                        invertedData[i + 2] = 255 - imageData.data[i + 2]; // B
-                                        invertedData[i + 3] = imageData.data[i + 3];       // A
-                                    }
-                                    
-                                    const invertedImageData = new ImageData(invertedData, imageData.width, imageData.height);
-                                    const invertedCode = jsQR(invertedImageData.data, invertedImageData.width, invertedImageData.height);
-                                    
-                                    if (invertedCode) {
-                                        resolve(invertedCode.data);
-                                    } else {
-                                        reject(new Error('لم يتم العثور على رمز QR في الصورة'));
-                                    }
-                                }
-                            } catch (error) {
-                                reject(error);
-                            }
-                        };
-                        
-                        script.onerror = () => {
-                            reject(new Error('فشل تحميل مكتبة قراءة QR'));
-                        };
-                        
-                        document.head.appendChild(script);
-                        return;
-                    }
+                    // بدائل أخرى للتعرف على QR
+                    // مثال: البحث عن بيانات معينة في المعلومات الوصفية للصورة
                     
-                    // إذا وصلنا إلى هنا، فقد فشلت جميع المحاولات
-                    reject(new Error('لم يتم العثور على رمز QR في الصورة'));
+                    // محاكاة للنجاح للأغراض التوضيحية
+                    if (Math.random() > 0.3 && investorCards.length > 0) {
+                        const randomIndex = Math.floor(Math.random() * investorCards.length);
+                        const card = investorCards[randomIndex];
+                        const data = JSON.stringify({
+                            cardId: card.id,
+                            investorId: card.investorId
+                        });
+                        resolve(data);
+                    } else {
+                        reject(new Error('لم يتم العثور على رمز QR في الصورة'));
+                    }
                 } catch (error) {
                     reject(error);
                 }
@@ -1358,45 +1046,6 @@ async function decodeQRFromImage(file) {
         
         reader.readAsDataURL(file);
     });
-}
-
-// تحميل QR البطاقة
-function downloadCardQR(cardId) {
-    const card = investorCards.find(c => c.id === cardId);
-    const investor = investors.find(inv => inv.id === card.investorId);
-    
-    if (!card || !investor) return;
-    
-    // إنشاء canvas جديد بحجم أكبر
-    const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 600;
-    
-    // توليد رمز QR بحجم أكبر للتحميل
-    generateCardQRCode(canvas, card, investor);
-    
-    // إضافة تفاصيل في أسفل الـ QR
-    setTimeout(() => {
-        const ctx = canvas.getContext('2d');
-        
-        // إضافة خلفية بيضاء
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 550, canvas.width, 50);
-        
-        // إضافة النص
-        ctx.font = 'bold 20px Arial';
-        ctx.fillStyle = '#000';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${investor.name} - ${getCardTypeName(card.type)}`, canvas.width / 2, canvas.height - 20);
-        
-        // تحميل الصورة
-        const link = document.createElement('a');
-        link.download = `card-qr-${card.number}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-        
-        createNotification('نجاح', 'تم تحميل رمز QR بنجاح', 'success');
-    }, 200);
 }
 
 // ===============================================================
@@ -1634,6 +1283,39 @@ function shareCard(cardId) {
         navigator.clipboard.writeText(url)
             .then(() => createNotification('نجاح', 'تم نسخ رابط البطاقة', 'success'));
     }
+}
+
+// تحميل QR البطاقة
+function downloadCardQR(cardId) {
+    const card = investorCards.find(c => c.id === cardId);
+    const investor = investors.find(inv => inv.id === card.investorId);
+    
+    if (!card || !investor) return;
+    
+    // إنشاء canvas جديد بحجم أكبر
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    
+    // توليد رمز QR بحجم أكبر للتحميل
+    generateCardQRCode(canvas, card, investor);
+    
+    // إضافة تفاصيل في أسفل الـ QR
+    setTimeout(() => {
+        const ctx = canvas.getContext('2d');
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${investor.name} - ${getCardTypeName(card.type)}`, canvas.width / 2, canvas.height - 20);
+        
+        // تحميل الصورة
+        const link = document.createElement('a');
+        link.download = `card-qr-${card.number}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        createNotification('نجاح', 'تم تحميل رمز QR بنجاح', 'success');
+    }, 200);
 }
 
 // عرض إحصائيات البطاقة
@@ -2009,23 +1691,6 @@ function toggleCardStatus() {
 }
 
 // حذف البطاقة
-function deleteCard() {
-    if (!currentCardId) return;
-    
-    if (confirm('هل أنت متأكد من حذف هذه البطاقة؟')) {
-        // حذف من Firebase
-        if (cardDatabase) {
-            cardDatabase.child(currentCardId).remove();
-        }
-        
-        investorCards = investorCards.filter(c => c.id !== currentCardId);
-        saveInvestorCards();
-        
-        if (typeof createNotification === 'function') {
-            createNotification('نجاح', 'تم حذف البطاقة بنجاح', 'success');
-        }
-        
-        // Continuación de la función deleteCard()
 function deleteCard() {
     if (!currentCardId) return;
     
@@ -2428,7 +2093,9 @@ class CardFirebaseManager {
         }
     }
 
-    // مراقبة حالة البطاقة
+   // Continuación del investor-card-system.js
+
+    // mraaqbt ḥālat al-biṭāqah (monitorCardStatus continuación)
     async monitorCardStatus(cardId) {
         try {
             if (!this.db) return;
@@ -2646,15 +2313,12 @@ class MobileAppAPI {
             const data = JSON.parse(qrData);
             
             // التحقق من صحة البيانات
-            if (!data.cardId && !data.id) {
+            if (!data.cardId || !data.investorId) {
                 throw new Error('بيانات QR غير صالحة');
             }
             
-            // استخراج معرف البطاقة (يدعم التنسيقين القديم والجديد)
-            const cardId = data.cardId || data.id;
-            
             // جلب تفاصيل البطاقة
-            const cardDetails = await this.getCardDetails(cardId, 'guest-token');
+            const cardDetails = await this.getCardDetails(data.cardId, 'guest-token');
             
             if (!cardDetails) {
                 throw new Error('البطاقة غير موجودة');
@@ -2665,7 +2329,7 @@ class MobileAppAPI {
                 success: true,
                 cardData: data,
                 cardDetails,
-                deepLink: data.appLinks?.deepLink || `investmentapp://card/${cardId}`
+                deepLink: data.appLinks?.deepLink
             };
         } catch (error) {
             console.error('❌ خطأ في معالجة رمز QR:', error);
@@ -3669,2253 +3333,3 @@ window.loadCardInvestors = loadCardInvestors;
 window.openCreateCardModal = openCreateCardModal;
 window.openModal = openModal;
 window.closeModal = closeModal;
-
-// إصلاح مشكلة إنشاء البطاقات الجديدة
-
-// 1. دالة للتشخيص وإصلاح المشاكل
-function diagnosisAndFixCardCreation() {
-    console.log("🔍 بدء تشخيص مشاكل إنشاء البطاقات...");
-    
-    // التحقق من وجود العناصر المطلوبة في DOM
-    const createCardBtn = document.querySelector('.btn-add-card, .add-card-button, button[onclick*="openCreateCardModal"]');
-    const createCardModal = document.getElementById('createCardModal');
-    const createCardForm = document.getElementById('createCardForm');
-    const cardInvestor = document.getElementById('cardInvestor');
-    const cardExpiry = document.getElementById('cardExpiry');
-    const cardTypeRadios = document.querySelectorAll('input[name="cardType"]');
-    
-    // عرض نتائج التشخيص
-    console.log("تم العثور على زر إنشاء البطاقة:", !!createCardBtn);
-    console.log("تم العثور على النافذة المنبثقة:", !!createCardModal);
-    console.log("تم العثور على نموذج إنشاء البطاقة:", !!createCardForm);
-    console.log("تم العثور على قائمة المستثمرين:", !!cardInvestor);
-    console.log("تم العثور على حقل تاريخ الانتهاء:", !!cardExpiry);
-    console.log("تم العثور على أزرار اختيار نوع البطاقة:", cardTypeRadios.length);
-    
-    // فحص المكتبات المطلوبة
-    console.log("مكتبة QRCode متاحة:", typeof QRCode !== 'undefined');
-    
-    // إصلاح المشكلات المحتملة:
-    
-    // 1. إعادة ربط زر الإنشاء
-    if (createCardBtn) {
-        createCardBtn.onclick = function() {
-            console.log("✅ تم النقر على زر إنشاء البطاقة");
-            openCreateCardModal();
-        };
-        console.log("✅ تم إعادة ربط زر إنشاء البطاقة");
-    } else {
-        console.error("❌ لم يتم العثور على زر إنشاء البطاقة - إنشاء زر بديل");
-        
-        // إنشاء زر بديل
-        const headerActions = document.querySelector('.header-actions, .page-header, .card-header, header');
-        if (headerActions) {
-            const newButton = document.createElement('button');
-            newButton.className = 'btn btn-primary btn-add-card';
-            newButton.innerHTML = '<i class="fas fa-plus"></i> إنشاء بطاقة جديدة';
-            newButton.onclick = openCreateCardModal;
-            headerActions.appendChild(newButton);
-            console.log("✅ تم إنشاء زر بديل");
-        }
-    }
-    
-    // 2. التحقق من نافذة الإنشاء وإصلاحها إذا لزم الأمر
-    if (!createCardModal) {
-        console.error("❌ لم يتم العثور على النافذة المنبثقة - إنشاء نافذة بديلة");
-        // إنشاء نافذة منبثقة بديلة
-        createCreateCardModal();
-        console.log("✅ تم إنشاء نافذة منبثقة بديلة");
-    }
-    
-    // 3. التحقق من وجود المستثمرين
-    if (cardInvestor && cardInvestor.options.length <= 1) {
-        console.warn("⚠️ لا يوجد مستثمرين في القائمة المنسدلة");
-        console.log("محاولة إعادة تحميل المستثمرين...");
-        loadCardInvestors();
-    }
-    
-    // 4. إعادة تعريف دالة إنشاء البطاقة لتكون أكثر مرونة
-    window.createInvestorCard = function() {
-        try {
-            console.log("🔄 بدء عملية إنشاء البطاقة");
-            
-            // الحصول على قيم الإدخال
-            const investorSelect = document.getElementById('cardInvestor');
-            const expiryInput = document.getElementById('cardExpiry');
-            const cardTypeRadios = document.querySelectorAll('input[name="cardType"]');
-            
-            if (!investorSelect) {
-                throw new Error("لم يتم العثور على حقل اختيار المستثمر");
-            }
-            
-            const investorId = investorSelect.value;
-            const expiry = expiryInput ? expiryInput.value : new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
-            
-            // تحديد نوع البطاقة المحدد
-            let cardType = 'premium'; // القيمة الافتراضية
-            cardTypeRadios.forEach(radio => {
-                if (radio.checked) {
-                    cardType = radio.value;
-                }
-            });
-            
-            console.log("قيم الإدخال:", { investorId, expiry, cardType });
-            
-            // التحقق من صحة الإدخال
-            if (!investorId) {
-                alert('يرجى اختيار المستثمر');
-                return;
-            }
-            
-            // التحقق من وجود مصفوفة البطاقات
-            if (!Array.isArray(window.investorCards)) {
-                console.warn("⚠️ مصفوفة البطاقات غير موجودة، سيتم إنشاؤها");
-                window.investorCards = [];
-            }
-            
-            // إنشاء البطاقة الجديدة
-            const newCard = {
-                id: generateId(),
-                investorId: investorId,
-                number: generateCardNumber(),
-                type: cardType,
-                expiry: expiry,
-                status: 'active',
-                createdAt: new Date().toISOString(),
-                transactions: [],
-                limits: {
-                    dailyLimit: cardType === 'platinum' ? 10000000 : cardType === 'gold' ? 5000000 : 2000000,
-                    monthlyLimit: cardType === 'platinum' ? 100000000 : cardType === 'gold' ? 50000000 : 20000000,
-                    withdrawalLimit: cardType === 'platinum' ? 5000000 : cardType === 'gold' ? 2500000 : 1000000
-                },
-                features: getCardFeatures(cardType)
-            };
-            
-            // إضافة البطاقة للمصفوفة
-            investorCards.push(newCard);
-            console.log("✅ تمت إضافة البطاقة:", newCard);
-            
-            // حفظ البطاقات
-            if (typeof saveInvestorCards === 'function') {
-                saveInvestorCards();
-            } else {
-                // حفظ في التخزين المحلي فقط إذا لم تكن الدالة موجودة
-                localStorage.setItem('investorCards', JSON.stringify(investorCards));
-                console.log("✅ تم حفظ البطاقات في التخزين المحلي");
-            }
-            
-            // مزامنة مع Firebase إذا كان متاحًا
-            if (typeof syncCardToFirebase === 'function') {
-                syncCardToFirebase(newCard);
-            }
-            
-            // إغلاق النافذة المنبثقة
-            closeModal('createCardModal');
-            
-            // تحديث العرض
-            if (typeof updateCardsDisplay === 'function') {
-                updateCardsDisplay();
-            }
-            
-            if (typeof updateCardsBadges === 'function') {
-                updateCardsBadges();
-            }
-            
-            // إظهار إشعار النجاح
-            if (typeof createNotification === 'function') {
-                createNotification('نجاح', 'تم إنشاء البطاقة بنجاح', 'success');
-            } else {
-                alert('تم إنشاء البطاقة بنجاح');
-            }
-            
-            console.log("✅ اكتملت عملية إنشاء البطاقة بنجاح");
-            return true;
-            
-        } catch (error) {
-            console.error("❌ حدث خطأ أثناء إنشاء البطاقة:", error);
-            alert(`حدث خطأ أثناء إنشاء البطاقة: ${error.message}`);
-            return false;
-        }
-    };
-    
-    // 5. إعادة تعريف دالة فتح النافذة المنبثقة
-    window.openCreateCardModal = function() {
-        try {
-            console.log("🔄 محاولة فتح نافذة إنشاء البطاقة");
-            
-            const form = document.getElementById('createCardForm');
-            if (form) {
-                form.reset();
-            }
-            
-            // تحميل المستثمرين
-            if (typeof loadCardInvestors === 'function') {
-                loadCardInvestors();
-            }
-            
-            // فتح النافذة المنبثقة
-            if (typeof openModal === 'function') {
-                openModal('createCardModal');
-            } else {
-                // فتح النافذة المنبثقة بطريقة بديلة
-                const modal = document.getElementById('createCardModal');
-                if (modal) {
-                    modal.classList.add('active');
-                    console.log("✅ تم فتح النافذة المنبثقة");
-                } else {
-                    console.error("❌ لم يتم العثور على النافذة المنبثقة");
-                    createCreateCardModal();
-                }
-            }
-            
-            // تحديث معاينة البطاقة
-            if (typeof updateCardPreview === 'function') {
-                updateCardPreview();
-            }
-            
-            console.log("✅ تم فتح نافذة إنشاء البطاقة بنجاح");
-            return true;
-            
-        } catch (error) {
-            console.error("❌ حدث خطأ أثناء فتح نافذة إنشاء البطاقة:", error);
-            // إنشاء النافذة المنبثقة بديلة إذا حدث خطأ
-            createCreateCardModal();
-            return false;
-        }
-    };
-    
-    console.log("✅ اكتمل تشخيص وإصلاح مشاكل إنشاء البطاقات");
-    return true;
-}
-
-// وظيفة إنشاء نافذة منبثقة بديلة
-function createCreateCardModal() {
-    // التحقق من عدم وجود النافذة بالفعل
-    if (document.getElementById('createCardModal')) {
-        return;
-    }
-    
-    // إنشاء عنصر النافذة المنبثقة
-    const modal = document.createElement('div');
-    modal.id = 'createCardModal';
-    modal.className = 'modal-overlay';
-    
-    // إنشاء HTML للنافذة المنبثقة
-    modal.innerHTML = `
-        <div class="modal">
-            <div class="modal-header">
-                <h2 class="modal-title">إنشاء بطاقة جديدة</h2>
-                <div class="modal-close" onclick="closeModal('createCardModal')">
-                    <i class="fas fa-times"></i>
-                </div>
-            </div>
-            <div class="modal-body">
-                <form id="createCardForm">
-                    <div class="form-group">
-                        <label for="cardInvestor">المستثمر</label>
-                        <select id="cardInvestor" class="form-control" required>
-                            <option value="">اختر المستثمر</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cardExpiry">تاريخ الانتهاء</label>
-                        <input type="month" id="cardExpiry" class="form-control" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>نوع البطاقة</label>
-                        <div class="card-types-grid">
-                            <div class="card-type-option premium">
-                                <input type="radio" name="cardType" id="cardTypePremium" value="premium" checked>
-                                <label for="cardTypePremium">
-                                    <i class="fas fa-star"></i>
-                                    <span>بريميوم</span>
-                                </label>
-                            </div>
-                            <div class="card-type-option gold">
-                                <input type="radio" name="cardType" id="cardTypeGold" value="gold">
-                                <label for="cardTypeGold">
-                                    <i class="fas fa-crown"></i>
-                                    <span>ذهبية</span>
-                                </label>
-                            </div>
-                            <div class="card-type-option platinum">
-                                <input type="radio" name="cardType" id="cardTypePlatinum" value="platinum">
-                                <label for="cardTypePlatinum">
-                                    <i class="fas fa-gem"></i>
-                                    <span>بلاتينية</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>معاينة البطاقة</label>
-                        <div id="cardPreview" class="card-preview-container"></div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-light" onclick="closeModal('createCardModal')">إلغاء</button>
-                <button class="btn btn-primary" onclick="createInvestorCard()">إنشاء البطاقة</button>
-            </div>
-        </div>
-    `;
-    
-    // إضافة النافذة المنبثقة إلى DOM
-    document.body.appendChild(modal);
-    
-    // إضافة نمط CSS للنافذة المنبثقة
-    const style = document.createElement('style');
-    style.textContent = `
-        .card-types-grid {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .card-type-option {
-            flex: 1;
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            border: 2px solid transparent;
-        }
-        
-        .card-type-option.premium {
-            background-color: rgba(52, 73, 94, 0.1);
-        }
-        
-        .card-type-option.gold {
-            background-color: rgba(241, 196, 15, 0.1);
-        }
-        
-        .card-type-option.platinum {
-            background-color: rgba(149, 165, 166, 0.1);
-        }
-        
-        .card-type-option.selected {
-            border-color: #3498db;
-            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
-        }
-        
-        .card-type-option input[type="radio"] {
-            display: none;
-        }
-        
-        .card-type-option label {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-            cursor: pointer;
-        }
-        
-        .card-type-option i {
-            font-size: 24px;
-        }
-        
-        .card-type-option.premium i {
-            color: #34495e;
-        }
-        
-        .card-type-option.gold i {
-            color: #f39c12;
-        }
-        
-        .card-type-option.platinum i {
-            color: #7f8c8d;
-        }
-        
-        .card-preview-container {
-            display: flex;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s, visibility 0.3s;
-        }
-        
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .modal {
-            background-color: white;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            transform: translateY(-20px);
-            opacity: 0;
-            transition: transform 0.3s, opacity 0.3s;
-        }
-        
-        .modal-overlay.active .modal {
-            transform: translateY(0);
-            opacity: 1;
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .modal-title {
-            margin: 0;
-            font-size: 18px;
-        }
-        
-        .modal-close {
-            cursor: pointer;
-            font-size: 18px;
-            color: #777;
-        }
-        
-        .modal-body {
-            padding: 20px;
-        }
-        
-        .modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid #eee;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-        }
-        
-        .btn-light {
-            background-color: #f8f9fa;
-            color: #333;
-        }
-        
-        .btn-light:hover {
-            background-color: #e9ecef;
-        }
-        
-        .btn-primary {
-            background-color: #3498db;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background-color: #2980b9;
-        }
-    `;
-    
-    document.head.appendChild(style);
-    
-    // إضافة مستمع الأحداث لاختيار نوع البطاقة
-    setTimeout(() => {
-        document.querySelectorAll('.card-type-option').forEach(option => {
-            option.addEventListener('click', function() {
-                document.querySelectorAll('.card-type-option').forEach(opt => 
-                    opt.classList.remove('selected'));
-                this.classList.add('selected');
-                this.querySelector('input[type="radio"]').checked = true;
-                if (typeof updateCardPreview === 'function') {
-                    updateCardPreview();
-                }
-            });
-        });
-        
-        // اختيار النوع الافتراضي
-        const defaultOption = document.querySelector('.card-type-option.premium');
-        if (defaultOption) {
-            defaultOption.classList.add('selected');
-            if (typeof updateCardPreview === 'function') {
-                updateCardPreview();
-            }
-        }
-        
-        // تحميل المستثمرين
-        if (typeof loadCardInvestors === 'function') {
-            loadCardInvestors();
-        } else {
-            // تعبئة القائمة المنسدلة من مصفوفة المستثمرين الحالية
-            const investorSelect = document.getElementById('cardInvestor');
-            if (investorSelect && Array.isArray(window.investors)) {
-                investorSelect.innerHTML = '<option value="">اختر المستثمر</option>';
-                window.investors.forEach(investor => {
-                    const option = document.createElement('option');
-                    option.value = investor.id;
-                    option.textContent = investor.name;
-                    investorSelect.appendChild(option);
-                });
-            }
-        }
-        
-        // تعيين تاريخ انتهاء افتراضي
-        const expiryInput = document.getElementById('cardExpiry');
-        if (expiryInput) {
-            const now = new Date();
-            const futureDate = new Date(now.getFullYear() + 3, now.getMonth());
-            expiryInput.value = futureDate.toISOString().slice(0, 7);
-        }
-    }, 100);
-    
-    console.log("✅ تم إنشاء نافذة إنشاء البطاقة بديلة");
-}
-
-// تحقق من وجود الدوال الضرورية وإنشائها إذا كانت غير موجودة
-function ensureRequiredFunctions() {
-    // تأكد من وجود وظيفة توليد المعرف
-    if (typeof window.generateId !== 'function') {
-        window.generateId = function() {
-            return Date.now().toString(36) + Math.random().toString(36).substring(2);
-        };
-    }
-    
-    // تأكد من وجود وظيفة توليد رقم البطاقة
-    if (typeof window.generateCardNumber !== 'function') {
-        window.generateCardNumber = function() {
-            const prefixes = {
-                'platinum': '5555',
-                'gold': '4444',
-                'premium': '3333'
-            };
-            
-            const cardType = document.querySelector('input[name="cardType"]:checked')?.value || 'premium';
-            const prefix = prefixes[cardType] || '3333';
-            
-            let number = prefix;
-            for (let i = 0; i < 12; i++) {
-                number += Math.floor(Math.random() * 10);
-            }
-            
-            return number;
-        };
-    }
-    
-    // تأكد من وجود وظيفة الحصول على مزايا البطاقة
-    if (typeof window.getCardFeatures !== 'function') {
-        window.getCardFeatures = function(cardType) {
-            switch (cardType) {
-                case 'platinum':
-                    return {
-                        profitBonus: 0.25,
-                        freeTransactions: -1,
-                        prioritySupport: true,
-                        vipAccess: true,
-                        insurance: true
-                    };
-                case 'gold':
-                    return {
-                        profitBonus: 0.15,
-                        freeTransactions: 50,
-                        prioritySupport: true,
-                        vipAccess: false,
-                        insurance: true
-                    };
-                case 'premium':
-                default:
-                    return {
-                        profitBonus: 0,
-                        freeTransactions: 20,
-                        prioritySupport: false,
-                        vipAccess: false,
-                        insurance: false
-                    };
-            }
-        };
-    }
-    
-    // تأكد من وجود وظيفة إغلاق النافذة المنبثقة
-    if (typeof window.closeModal !== 'function') {
-        window.closeModal = function(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.classList.remove('active');
-            }
-        };
-    }
-    
-    // تأكد من وجود وظيفة مصفوفات البيانات الأساسية
-    if (!Array.isArray(window.investorCards)) {
-        window.investorCards = JSON.parse(localStorage.getItem('investorCards') || '[]');
-    }
-    
-    if (!Array.isArray(window.investors)) {
-        window.investors = JSON.parse(localStorage.getItem('investors') || '[]');
-    }
-    
-    console.log("✅ تم التأكد من وجود جميع الدوال الضرورية");
-}
-
-// وظيفة فتح وإغلاق القائمة المنسدلة
-function fixDropdownSelectors() {
-    // إضافة مستمعي الأحداث للقوائم المنسدلة
-    document.querySelectorAll('select.form-control').forEach(select => {
-        select.addEventListener('focus', function() {
-            this.size = 5; // يعرض 5 خيارات عند الفتح
-        });
-        
-        select.addEventListener('blur', function() {
-            this.size = 1; // يعود إلى العرض العادي عند إغلاق التركيز
-        });
-        
-        select.addEventListener('change', function() {
-            this.size = 1; // يغلق القائمة بعد التحديد
-            this.blur(); // يزيل التركيز
-        });
-    });
-    
-    console.log("✅ تم إصلاح القوائم المنسدلة");
-}
-
-// تنفيذ الإصلاحات عند تحميل الصفحة
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("🔄 بدء تطبيق إصلاحات نظام البطاقات...");
-    
-    // التأكد من وجود الدوال الضرورية
-    ensureRequiredFunctions();
-    
-    // تشخيص وإصلاح مشاكل إنشاء البطاقات
-    diagnosisAndFixCardCreation();
-    
-    // إصلاح القوائم المنسدلة
-    fixDropdownSelectors();
-    
-    // إضافة زر لإظهار السجل بالكنسول
-    const debugBtn = document.createElement('button');
-    debugBtn.textContent = "عرض سجل التشخيص";
-    debugBtn.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        z-index: 9999;
-        padding: 10px 15px;
-        background-color: #34495e;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-    `;
-    debugBtn.onclick = function() {
-        console.log("=== حالة نظام البطاقات ===");
-        console.log("البطاقات:", window.investorCards);
-        console.log("المستثمرون:", window.investors);
-        diagnosisAndFixCardCreation();
-        alert("تم عرض معلومات التشخيص في وحدة التحكم");
-    };
-    document.body.appendChild(debugBtn);
-    
-    console.log("✅ تم تطبيق جميع الإصلاحات بنجاح");
-});
-
-// نظام استعادة وإصلاح بطاقات المستثمرين الشامل
-// يعالج مشكلة عدم القدرة على إضافة بطاقات جديدة واستعادة البطاقات المفقودة
-
-// ============= القسم 1: وظائف التشخيص واستعادة البيانات =============
-
-// استعادة البطاقات من جميع مصادر التخزين المحتملة
-async function recoverAllCards() {
-    console.log("🔄 بدء عملية استعادة جميع البطاقات من كافة المصادر...");
-    
-    let recoveredCards = [];
-    
-    // 1. محاولة استرداد البطاقات من localStorage
-    try {
-        const localCards = localStorage.getItem('investorCards');
-        if (localCards) {
-            const parsedLocalCards = JSON.parse(localCards);
-            if (Array.isArray(parsedLocalCards)) {
-                console.log(`✅ تم العثور على ${parsedLocalCards.length} بطاقة في التخزين المحلي`);
-                recoveredCards = recoveredCards.concat(parsedLocalCards);
-            }
-        }
-    } catch (error) {
-        console.error("❌ خطأ في استرداد البطاقات من التخزين المحلي:", error);
-    }
-    
-    // 2. محاولة استرداد البطاقات من Firebase إذا كان متاحًا
-    try {
-        if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-            const snapshot = await firebase.database().ref('investorCards').once('value');
-            const firebaseCards = snapshot.val();
-            
-            if (firebaseCards) {
-                const firebaseCardsArray = Object.values(firebaseCards);
-                console.log(`✅ تم العثور على ${firebaseCardsArray.length} بطاقة في Firebase`);
-                
-                // دمج البطاقات مع تجنب التكرار
-                firebaseCardsArray.forEach(fbCard => {
-                    if (!recoveredCards.some(card => card.id === fbCard.id)) {
-                        recoveredCards.push(fbCard);
-                    }
-                });
-            }
-        }
-    } catch (error) {
-        console.error("❌ خطأ في استرداد البطاقات من Firebase:", error);
-    }
-    
-    // 3. البحث عن بطاقات في مصادر التخزين الأخرى بالمتصفح
-    try {
-        // البحث في sessionStorage
-        const sessionCards = sessionStorage.getItem('investorCards');
-        if (sessionCards) {
-            const parsedSessionCards = JSON.parse(sessionCards);
-            if (Array.isArray(parsedSessionCards)) {
-                console.log(`✅ تم العثور على ${parsedSessionCards.length} بطاقة في التخزين المؤقت`);
-                
-                // إضافة البطاقات الفريدة فقط
-                parsedSessionCards.forEach(sCard => {
-                    if (!recoveredCards.some(card => card.id === sCard.id)) {
-                        recoveredCards.push(sCard);
-                    }
-                });
-            }
-        }
-        
-        // البحث في IndexedDB إذا كان متاحًا
-        if ('indexedDB' in window) {
-            const idbPromise = new Promise((resolve) => {
-                const request = indexedDB.open('investmentApp', 1);
-                request.onerror = () => resolve([]);
-                request.onsuccess = function() {
-                    try {
-                        const db = request.result;
-                        if (db.objectStoreNames.contains('investorCards')) {
-                            const transaction = db.transaction(['investorCards'], 'readonly');
-                            const store = transaction.objectStore('investorCards');
-                            const getAll = store.getAll();
-                            
-                            getAll.onsuccess = function() {
-                                const idbCards = getAll.result || [];
-                                console.log(`✅ تم العثور على ${idbCards.length} بطاقة في IndexedDB`);
-                                resolve(idbCards);
-                            };
-                            
-                            getAll.onerror = () => resolve([]);
-                        } else {
-                            resolve([]);
-                        }
-                    } catch (error) {
-                        console.error("خطأ في IndexedDB:", error);
-                        resolve([]);
-                    }
-                };
-            });
-            
-            const idbCards = await idbPromise;
-            
-            // إضافة البطاقات الفريدة من IndexedDB
-            idbCards.forEach(idbCard => {
-                if (!recoveredCards.some(card => card.id === idbCard.id)) {
-                    recoveredCards.push(idbCard);
-                }
-            });
-        }
-    } catch (error) {
-        console.error("❌ خطأ في البحث عن البطاقات في مصادر التخزين الأخرى:", error);
-    }
-    
-    // حفظ البطاقات المستردة في النظام
-    if (recoveredCards.length > 0) {
-        console.log(`✅ تم استرداد ${recoveredCards.length} بطاقة بشكل إجمالي`);
-        
-        // تحديث المتغير العالمي
-        window.investorCards = recoveredCards;
-        
-        // حفظ في التخزين المحلي
-        localStorage.setItem('investorCards', JSON.stringify(recoveredCards));
-        
-        // مزامنة مع Firebase إذا كان متاحًا
-        try {
-            if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-                recoveredCards.forEach(card => {
-                    firebase.database().ref(`investorCards/${card.id}`).set(card);
-                });
-                console.log("✅ تم مزامنة البطاقات المستردة مع Firebase");
-            }
-        } catch (error) {
-            console.error("❌ خطأ في مزامنة البطاقات مع Firebase:", error);
-        }
-        
-        // تحديث واجهة المستخدم
-        if (typeof updateCardsDisplay === 'function') {
-            updateCardsDisplay();
-        }
-        
-        if (typeof updateCardsBadges === 'function') {
-            updateCardsBadges();
-        }
-        
-        // عرض إشعار نجاح
-        showRecoveryNotification(recoveredCards.length);
-        
-        return recoveredCards;
-    } else {
-        console.warn("⚠️ لم يتم العثور على أي بطاقات لاستردادها");
-        return [];
-    }
-}
-
-// عرض إشعار استعادة البطاقات
-function showRecoveryNotification(count) {
-    // إنشاء عنصر الإشعار
-    const notification = document.createElement('div');
-    notification.className = 'recovery-notification';
-    notification.innerHTML = `
-        <div class="recovery-icon">
-            <i class="fas fa-undo"></i>
-        </div>
-        <div class="recovery-content">
-            <h3>تم استعادة البطاقات بنجاح</h3>
-            <p>تم استرداد ${count} بطاقة من مصادر التخزين المختلفة</p>
-        </div>
-        <button class="recovery-close">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    // إضافة نمط CSS
-    const style = document.createElement('style');
-    style.textContent = `
-        .recovery-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background-color: #27ae60;
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            display: flex;
-            align-items: flex-start;
-            gap: 15px;
-            z-index: 10000;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            min-width: 300px;
-            animation: slideIn 0.5s ease;
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
-        
-        .recovery-icon {
-            font-size: 24px;
-        }
-        
-        .recovery-content {
-            flex: 1;
-        }
-        
-        .recovery-content h3 {
-            margin: 0 0 5px 0;
-            font-size: 18px;
-        }
-        
-        .recovery-content p {
-            margin: 0;
-            font-size: 14px;
-        }
-        
-        .recovery-close {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 16px;
-            padding: 0;
-        }
-    `;
-    
-    document.head.appendChild(style);
-    document.body.appendChild(notification);
-    
-    // إضافة معالج الحدث للزر الإغلاق
-    notification.querySelector('.recovery-close').addEventListener('click', () => {
-        notification.remove();
-    });
-    
-    // إزالة الإشعار تلقائيًا بعد 10 ثوانٍ
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.5s ease forwards';
-        
-        // إضافة تعريف الرسوم المتحركة للخروج
-        const exitAnimation = document.createElement('style');
-        exitAnimation.textContent = `
-            @keyframes slideOut {
-                from { transform: translateX(0); }
-                to { transform: translateX(100%); }
-            }
-        `;
-        document.head.appendChild(exitAnimation);
-        
-        setTimeout(() => {
-            notification.remove();
-        }, 500);
-    }, 10000);
-}
-
-// ============= القسم 2: إصلاح نظام إضافة البطاقات الجديدة =============
-
-// نظام إضافة البطاقات الجديد (مستقل تمامًا)
-function createNewCardSystem() {
-    console.log("🔄 إنشاء نظام جديد مستقل لإضافة البطاقات...");
-    
-    // 1. إنشاء زر إضافة بطاقة جديد
-    createNewAddCardButton();
-    
-    // 2. إنشاء نافذة إضافة بطاقة جديدة
-    createNewCardModal();
-    
-    // 3. تعريف وظائف معالجة البطاقات
-    defineCardProcessingFunctions();
-    
-    console.log("✅ تم إنشاء نظام إضافة البطاقات الجديد بنجاح");
-}
-
-// إنشاء زر إضافة بطاقة جديد
-function createNewAddCardButton() {
-    // إزالة الزر القديم إن وجد
-    const oldButton = document.querySelector('.add-card-button, .btn-add-card');
-    if (oldButton) {
-        oldButton.remove();
-    }
-    
-    // البحث عن حاوية مناسبة للزر
-    let buttonContainer = document.querySelector('.header-actions, .page-header, .card-header, header');
-    
-    if (!buttonContainer) {
-        // إنشاء حاوية إذا لم تكن موجودة
-        buttonContainer = document.createElement('div');
-        buttonContainer.className = 'header-actions';
-        buttonContainer.style.cssText = 'display: flex; justify-content: flex-end; padding: 10px; margin-bottom: 20px;';
-        
-        // إضافة الحاوية للصفحة
-        const mainContent = document.querySelector('.main-content, main, .container, body');
-        if (mainContent) {
-            mainContent.insertBefore(buttonContainer, mainContent.firstChild);
-        } else {
-            document.body.insertBefore(buttonContainer, document.body.firstChild);
-        }
-    }
-    
-    // إنشاء الزر الجديد
-    const newButton = document.createElement('button');
-    newButton.className = 'btn btn-primary new-add-card-button';
-    newButton.innerHTML = '<i class="fas fa-plus"></i> إضافة بطاقة جديدة';
-    newButton.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;';
-    
-    // إضافة الحدث
-    newButton.onclick = function() {
-        openNewCardModal();
-    };
-    
-    // إضافة الزر للحاوية
-    buttonContainer.appendChild(newButton);
-    console.log("✅ تم إنشاء زر إضافة بطاقة جديد");
-}
-
-// إنشاء نافذة إضافة بطاقة جديدة
-function createNewCardModal() {
-    // إزالة النافذة القديمة إن وجدت
-    const oldModal = document.getElementById('new-card-modal');
-    if (oldModal) {
-        oldModal.remove();
-    }
-    
-    // إنشاء النافذة الجديدة
-    const modal = document.createElement('div');
-    modal.id = 'new-card-modal';
-    modal.className = 'modal-overlay';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 0.3s, visibility 0.3s;
-    `;
-    
-    // محتوى النافذة
-    modal.innerHTML = `
-        <div class="modal-content" style="
-            background-color: white;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            transform: translateY(-20px);
-            opacity: 0;
-            transition: transform 0.3s, opacity 0.3s;
-        ">
-            <div class="modal-header" style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 15px 20px;
-                border-bottom: 1px solid #eee;
-            ">
-                <h2 style="margin: 0; font-size: 20px; color: #333;">إضافة بطاقة جديدة</h2>
-                <button class="modal-close-btn" style="
-                    background: none;
-                    border: none;
-                    font-size: 20px;
-                    cursor: pointer;
-                    color: #777;
-                ">×</button>
-            </div>
-            
-            <div class="modal-body" style="padding: 20px;">
-                <form id="new-card-form">
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label for="new-card-investor" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">المستثمر</label>
-                        <select id="new-card-investor" style="
-                            width: 100%;
-                            padding: 12px;
-                            border: 1px solid #ddd;
-                            border-radius: 5px;
-                            font-size: 16px;
-                            background-color: #f8f9fa;
-                        " required>
-                            <option value="">اختر المستثمر</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label for="new-card-expiry" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">تاريخ الانتهاء</label>
-                        <input type="month" id="new-card-expiry" style="
-                            width: 100%;
-                            padding: 12px;
-                            border: 1px solid #ddd;
-                            border-radius: 5px;
-                            font-size: 16px;
-                            background-color: #f8f9fa;
-                        " required>
-                    </div>
-                    
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">نوع البطاقة</label>
-                        <div class="card-types" style="
-                            display: flex;
-                            gap: 10px;
-                        ">
-                            <div class="card-type-option premium" style="
-                                flex: 1;
-                                border: 2px solid #e9ecef;
-                                border-radius: 10px;
-                                padding: 15px 10px;
-                                text-align: center;
-                                cursor: pointer;
-                                transition: all 0.3s;
-                                background-color: rgba(52, 73, 94, 0.1);
-                            " data-type="premium">
-                                <input type="radio" name="new-card-type" value="premium" style="display: none;" checked>
-                                <div style="font-size: 24px; margin-bottom: 10px; color: #34495e;">
-                                    <i class="fas fa-star"></i>
-                                </div>
-                                <div style="font-weight: 600; color: #333;">بريميوم</div>
-                            </div>
-                            
-                            <div class="card-type-option gold" style="
-                                flex: 1;
-                                border: 2px solid #e9ecef;
-                                border-radius: 10px;
-                                padding: 15px 10px;
-                                text-align: center;
-                                cursor: pointer;
-                                transition: all 0.3s;
-                                background-color: rgba(241, 196, 15, 0.1);
-                            " data-type="gold">
-                                <input type="radio" name="new-card-type" value="gold" style="display: none;">
-                                <div style="font-size: 24px; margin-bottom: 10px; color: #f39c12;">
-                                    <i class="fas fa-crown"></i>
-                                </div>
-                                <div style="font-weight: 600; color: #333;">ذهبية</div>
-                            </div>
-                            
-                            <div class="card-type-option platinum" style="
-                                flex: 1;
-                                border: 2px solid #e9ecef;
-                                border-radius: 10px;
-                                padding: 15px 10px;
-                                text-align: center;
-                                cursor: pointer;
-                                transition: all 0.3s;
-                                background-color: rgba(149, 165, 166, 0.1);
-                            " data-type="platinum">
-                                <input type="radio" name="new-card-type" value="platinum" style="display: none;">
-                                <div style="font-size: 24px; margin-bottom: 10px; color: #7f8c8d;">
-                                    <i class="fas fa-gem"></i>
-                                </div>
-                                <div style="font-weight: 600; color: #333;">بلاتينية</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">معاينة البطاقة</label>
-                        <div id="new-card-preview" style="
-                            display: flex;
-                            justify-content: center;
-                            margin-top: 10px;
-                            padding: 20px;
-                            background-color: #f8f9fa;
-                            border-radius: 10px;
-                            min-height: 200px;
-                        "></div>
-                    </div>
-                </form>
-            </div>
-            
-            <div class="modal-footer" style="
-                padding: 15px 20px;
-                border-top: 1px solid #eee;
-                display: flex;
-                justify-content: flex-end;
-                gap: 10px;
-            ">
-                <button class="btn-cancel" style="
-                    padding: 10px 20px;
-                    border: none;
-                    border-radius: 5px;
-                    background-color: #f8f9fa;
-                    color: #333;
-                    cursor: pointer;
-                    font-size: 16px;
-                ">إلغاء</button>
-                
-                <button class="btn-create" style="
-                    padding: 10px 20px;
-                    border: none;
-                    border-radius: 5px;
-                    background-color: #3498db;
-                    color: white;
-                    cursor: pointer;
-                    font-size: 16px;
-                ">إنشاء البطاقة</button>
-            </div>
-        </div>
-    `;
-    
-    // إضافة النافذة إلى DOM
-    document.body.appendChild(modal);
-    
-    // إضافة معالجي الأحداث
-    const closeBtn = modal.querySelector('.modal-close-btn');
-    const cancelBtn = modal.querySelector('.btn-cancel');
-    const createBtn = modal.querySelector('.btn-create');
-    const cardTypeOptions = modal.querySelectorAll('.card-type-option');
-    
-    // زر الإغلاق
-    closeBtn.addEventListener('click', closeNewCardModal);
-    cancelBtn.addEventListener('click', closeNewCardModal);
-    
-    // زر الإنشاء
-    createBtn.addEventListener('click', createNewCard);
-    
-    // خيارات نوع البطاقة
-    cardTypeOptions.forEach(option => {
-        option.addEventListener('click', function() {
-            // إزالة الفئة من جميع الخيارات
-            cardTypeOptions.forEach(opt => {
-                opt.style.borderColor = '#e9ecef';
-                opt.style.boxShadow = 'none';
-            });
-            
-            // إضافة الفئة للخيار المحدد
-            this.style.borderColor = '#3498db';
-            this.style.boxShadow = '0 0 10px rgba(52, 152, 219, 0.3)';
-            
-            // تحديد زر الراديو
-            this.querySelector('input[type="radio"]').checked = true;
-            
-            // تحديث المعاينة
-            updateNewCardPreview();
-        });
-    });
-    
-    // تحديد الخيار الافتراضي
-    cardTypeOptions[0].style.borderColor = '#3498db';
-    cardTypeOptions[0].style.boxShadow = '0 0 10px rgba(52, 152, 219, 0.3)';
-    
-    // تحميل المستثمرين
-    loadInvestorsForNewCard();
-    
-    // تعيين تاريخ انتهاء افتراضي
-    const expiryInput = document.getElementById('new-card-expiry');
-    if (expiryInput) {
-        const now = new Date();
-        const futureDate = new Date(now.getFullYear() + 3, now.getMonth());
-        expiryInput.value = futureDate.toISOString().slice(0, 7);
-    }
-    
-    // تحديث المعاينة
-    updateNewCardPreview();
-    
-    console.log("✅ تم إنشاء نافذة إضافة البطاقة الجديدة");
-}
-
-// فتح نافذة إضافة البطاقة الجديدة
-function openNewCardModal() {
-    const modal = document.getElementById('new-card-modal');
-    if (!modal) {
-        createNewCardModal();
-        setTimeout(openNewCardModal, 100);
-        return;
-    }
-    
-    // عرض النافذة
-    modal.style.visibility = 'visible';
-    modal.style.opacity = '1';
-    
-    // تحريك المحتوى
-    const modalContent = modal.querySelector('.modal-content');
-    if (modalContent) {
-        modalContent.style.transform = 'translateY(0)';
-        modalContent.style.opacity = '1';
-    }
-    
-    // تحديث قائمة المستثمرين
-    loadInvestorsForNewCard();
-    
-    // تحديث المعاينة
-    updateNewCardPreview();
-    
-    console.log("✅ تم فتح نافذة إضافة البطاقة");
-}
-
-// إغلاق نافذة إضافة البطاقة الجديدة
-function closeNewCardModal() {
-    const modal = document.getElementById('new-card-modal');
-    if (!modal) return;
-    
-    // إخفاء المحتوى
-    const modalContent = modal.querySelector('.modal-content');
-    if (modalContent) {
-        modalContent.style.transform = 'translateY(-20px)';
-        modalContent.style.opacity = '0';
-    }
-    
-    // إخفاء النافذة
-    setTimeout(() => {
-        modal.style.opacity = '0';
-        modal.style.visibility = 'hidden';
-    }, 300);
-    
-    console.log("✅ تم إغلاق نافذة إضافة البطاقة");
-}
-
-// تحميل المستثمرين لنافذة البطاقة الجديدة
-function loadInvestorsForNewCard() {
-    const investorSelect = document.getElementById('new-card-investor');
-    if (!investorSelect) return;
-    
-    // مسح القائمة
-    investorSelect.innerHTML = '<option value="">اختر المستثمر</option>';
-    
-    // التحقق من وجود مصفوفة المستثمرين
-    if (!Array.isArray(window.investors) || window.investors.length === 0) {
-        // محاولة تحميل المستثمرين من مصادر مختلفة
-        const storedInvestors = localStorage.getItem('investors');
-        if (storedInvestors) {
-            window.investors = JSON.parse(storedInvestors);
-        } else if (typeof loadInvestors === 'function') {
-            loadInvestors();
-        } else if (typeof fetchInvestors === 'function') {
-            fetchInvestors();
-        }
-        
-        // إذا ما زالت المصفوفة فارغة، إضافة بعض البيانات الافتراضية للتجربة
-        if (!Array.isArray(window.investors) || window.investors.length === 0) {
-            window.investors = [
-                { id: 'inv1', name: 'أحمد محمود', phone: '07700000001' },
-                { id: 'inv2', name: 'سارة عبدالله', phone: '07700000002' },
-                { id: 'inv3', name: 'محمد علي', phone: '07700000003' }
-            ];
-        }
-    }
-    
-    // إضافة المستثمرين للقائمة
-    window.investors.forEach(investor => {
-        const option = document.createElement('option');
-        option.value = investor.id;
-        option.textContent = investor.name;
-        option.dataset.phone = investor.phone || '';
-        investorSelect.appendChild(option);
-    });
-    
-    console.log(`✅ تم تحميل ${window.investors.length} مستثمر في القائمة`);
-}
-
-// تحديث معاينة البطاقة الجديدة
-function updateNewCardPreview() {
-    const previewContainer = document.getElementById('new-card-preview');
-    if (!previewContainer) return;
-    
-    // الحصول على البيانات
-    const investorSelect = document.getElementById('new-card-investor');
-    const expiryInput = document.getElementById('new-card-expiry');
-    const cardTypeRadios = document.querySelectorAll('input[name="new-card-type"]');
-    
-    // اختيار المستثمر
-    let investor;
-    if (investorSelect && investorSelect.value) {
-        const selectedInvestor = window.investors.find(inv => inv.id === investorSelect.value);
-        investor = selectedInvestor || { id: 'temp', name: investorSelect.options[investorSelect.selectedIndex].text };
-    } else {
-        investor = { id: 'temp', name: 'حامل البطاقة' };
-    }
-    
-    // تاريخ الانتهاء
-    const expiry = expiryInput ? expiryInput.value : new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
-    
-    // نوع البطاقة
-    let cardType = 'premium';
-    cardTypeRadios.forEach(radio => {
-        if (radio.checked) {
-            cardType = radio.value;
-        }
-    });
-    
-    // إنشاء رقم بطاقة مؤقت
-    const tempNumber = generateTempCardNumber(cardType);
-    
-    // إنشاء بطاقة مؤقتة
-    const tempCard = {
-        id: 'preview',
-        number: tempNumber,
-        type: cardType,
-        expiry: expiry,
-        status: 'active',
-        investorId: investor.id
-    };
-    
-    // إنشاء HTML للمعاينة
-    previewContainer.innerHTML = createCardPreviewHTML(tempCard, investor);
-}
-
-// إنشاء HTML لمعاينة البطاقة
-function createCardPreviewHTML(card, investor) {
-    return `
-        <div class="preview-card ${card.type}" style="
-            width: 350px;
-            height: 220px;
-            border-radius: 15px;
-            position: relative;
-            overflow: hidden;
-            background: ${getCardGradient(card.type)};
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        ">
-            <div class="card-shimmer" style="
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-                animation: shimmer 3s infinite;
-            "></div>
-            
-            <style>
-                @keyframes shimmer {
-                    0% { left: -100%; }
-                    50% { left: 100%; }
-                    100% { left: 100%; }
-                }
-            </style>
-            
-            <div class="card-content" style="
-                position: relative;
-                height: 100%;
-                padding: 20px;
-                color: white;
-                z-index: 1;
-            ">
-                <div class="card-header" style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    margin-bottom: 15px;
-                ">
-                    <div class="card-logo" style="
-                        width: 60px;
-                        height: 35px;
-                        background: white;
-                        border-radius: 5px;
-                        padding: 5px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    ">
-                        <div style="font-size: 12px; font-weight: bold; color: #333;">IIB</div>
-                    </div>
-                    
-                    <div class="card-chip-container" style="
-                        position: absolute;
-                        top: 60px;
-                        left: 30px;
-                    ">
-                        <div class="card-chip" style="
-                            width: 50px;
-                            height: 40px;
-                            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-                            border-radius: 8px;
-                            position: relative;
-                            overflow: hidden;
-                        ">
-                            <div class="chip-lines" style="
-                                position: absolute;
-                                top: 50%;
-                                left: 50%;
-                                transform: translate(-50%, -50%);
-                                width: 35px;
-                                height: 25px;
-                                border: 2px solid rgba(0,0,0,0.2);
-                                border-radius: 4px;
-                            "></div>
-                        </div>
-                    </div>
-                    
-                    <div class="card-type-icon" style="
-                        font-size: 24px;
-                        color: rgba(255,255,255,0.8);
-                    ">
-                        <i class="fas fa-${card.type === 'platinum' ? 'gem' : card.type === 'gold' ? 'crown' : 'star'}"></i>
-                    </div>
-                </div>
-                
-                <div class="card-qr-container" style="
-                    position: absolute;
-                    top: 20px;
-                    right: 20px;
-                    background: white;
-                    padding: 5px;
-                    border-radius: 8px;
-                    width: 80px;
-                    height: 80px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                ">
-                    <div style="font-size: 50px; color: #333;">
-                        <i class="fas fa-qrcode"></i>
-                    </div>
-                </div>
-                
-                <div class="card-number" style="
-                    font-size: 20px;
-                    letter-spacing: 3px;
-                    margin-top: 20px;
-                    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-                    font-family: 'Courier New', monospace;
-                ">
-                    ${formatCardNumberForDisplay(card.number)}
-                </div>
-                
-                <div class="card-details" style="
-                    position: absolute;
-                    bottom: 20px;
-                    left: 20px;
-                    right: 20px;
-                    display: flex;
-                    justify-content: space-between;
-                ">
-                    <div class="card-holder">
-                        <div class="card-label" style="
-                            font-size: 9px;
-                            text-transform: uppercase;
-                            letter-spacing: 1px;
-                            opacity: 0.7;
-                            margin-bottom: 5px;
-                        ">CARD HOLDER</div>
-                        <div class="card-value" style="
-                            font-size: 14px;
-                            font-weight: 600;
-                            letter-spacing: 1px;
-                        ">${investor.name.toUpperCase()}</div>
-                    </div>
-                    
-                    <div class="card-expiry">
-                        <div class="card-label" style="
-                            font-size: 9px;
-                            text-transform: uppercase;
-                            letter-spacing: 1px;
-                            opacity: 0.7;
-                            margin-bottom: 5px;
-                        ">VALID THRU</div>
-                        <div class="card-value" style="
-                            font-size: 14px;
-                            font-weight: 600;
-                            letter-spacing: 1px;
-                        ">${formatExpiryForDisplay(card.expiry)}</div>
-                    </div>
-                </div>
-                
-                <div class="card-footer" style="
-                    position: absolute;
-                    bottom: 10px;
-                    right: 20px;
-                    text-align: right;
-                ">
-                    <div class="card-bank-name" style="
-                        font-size: 10px;
-                        opacity: 0.6;
-                    ">بنك الاستثمار العراقي</div>
-                    <div class="card-type-name" style="
-                        font-size: 12px;
-                        font-weight: 600;
-                        margin-top: 3px;
-                    ">${getCardTypeNameForDisplay(card.type).toUpperCase()}</div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// الحصول على تدرج لون البطاقة
-function getCardGradient(cardType) {
-    switch (cardType) {
-        case 'platinum':
-            return 'linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)';
-        case 'gold':
-            return 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)';
-        case 'premium':
-        default:
-            return 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)';
-    }
-}
-
-// توليد رقم بطاقة مؤقت
-function generateTempCardNumber(cardType) {
-    const prefixes = {
-        'platinum': '5555',
-        'gold': '4444',
-        'premium': '3333'
-    };
-    
-    const prefix = prefixes[cardType] || '3333';
-    
-    let number = prefix;
-    for (let i = 0; i < 12; i++) {
-        number += Math.floor(Math.random() * 10);
-    }
-    
-    return number;
-}
-
-// تنسيق رقم البطاقة للعرض
-function formatCardNumberForDisplay(number) {
-    return number.replace(/(\d{4})/g, '$1 ').trim();
-}
-
-// تنسيق تاريخ الانتهاء للعرض
-function formatExpiryForDisplay(date) {
-    if (!date) return '';
-    const parts = date.split('-');
-    return `${parts[1]}/${parts[0].substring(2)}`;
-}
-
-// الحصول على اسم نوع البطاقة للعرض
-function getCardTypeNameForDisplay(type) {
-    switch (type) {
-        case 'platinum': return 'بلاتينية';
-        case 'gold': return 'ذهبية';
-        case 'premium': return 'بريميوم';
-        default: return type;
-    }
-}
-
-// إنشاء بطاقة جديدة
-function createNewCard() {
-    try {
-        console.log("🔄 جاري إنشاء بطاقة جديدة...");
-        
-        // الحصول على البيانات
-        const investorSelect = document.getElementById('new-card-investor');
-        const expiryInput = document.getElementById('new-card-expiry');
-        const cardTypeRadios = document.querySelectorAll('input[name="new-card-type"]');
-        
-        if (!investorSelect) {
-            throw new Error("لم يتم العثور على حقل اختيار المستثمر");
-        }
-        
-        // معرف المستثمر
-        const investorId = investorSelect.value;
-        if (!investorId) {
-            showValidationError("يرجى اختيار المستثمر");
-            return;
-        }
-        
-        // تاريخ الانتهاء
-        const expiry = expiryInput ? expiryInput.value : new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
-        if (!expiry) {
-            showValidationError("يرجى إدخال تاريخ الانتهاء");
-            return;
-        }
-        
-        // نوع البطاقة
-        let cardType = 'premium';
-        cardTypeRadios.forEach(radio => {
-            if (radio.checked) {
-                cardType = radio.value;
-            }
-        });
-        
-        // التأكد من وجود مصفوفة البطاقات
-        if (!Array.isArray(window.investorCards)) {
-            window.investorCards = [];
-        }
-        
-        // توليد معرف جديد
-        const newId = generateUniqueId();
-        
-        // توليد رقم بطاقة
-        const newNumber = generateCardNumber(cardType);
-        
-        // إنشاء كائن البطاقة الجديدة
-        const newCard = {
-            id: newId,
-            investorId: investorId,
-            number: newNumber,
-            type: cardType,
-            expiry: expiry,
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            transactions: [],
-            limits: {
-                dailyLimit: cardType === 'platinum' ? 10000000 : cardType === 'gold' ? 5000000 : 2000000,
-                monthlyLimit: cardType === 'platinum' ? 100000000 : cardType === 'gold' ? 50000000 : 20000000,
-                withdrawalLimit: cardType === 'platinum' ? 5000000 : cardType === 'gold' ? 2500000 : 1000000
-            },
-            features: getCardFeaturesForType(cardType)
-        };
-        
-        // إضافة البطاقة للمصفوفة
-        window.investorCards.push(newCard);
-        
-        // حفظ البطاقات
-        saveCards(newCard);
-        
-        // إغلاق النافذة
-        closeNewCardModal();
-        
-        // تحديث واجهة المستخدم
-        updateUI();
-        
-        // عرض إشعار نجاح
-        showSuccessNotification('تم إنشاء البطاقة بنجاح');
-        
-        console.log("✅ تم إنشاء البطاقة بنجاح:", newCard);
-        return true;
-        
-    } catch (error) {
-        console.error("❌ حدث خطأ أثناء إنشاء البطاقة:", error);
-        showErrorNotification(`حدث خطأ: ${error.message}`);
-        return false;
-    }
-}
-
-// عرض خطأ التحقق
-function showValidationError(message) {
-    // إنشاء عنصر الخطأ
-    const errorElement = document.createElement('div');
-    errorElement.className = 'validation-error';
-    errorElement.style.cssText = `
-        background-color: #f8d7da;
-        color: #721c24;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-        text-align: center;
-        animation: shake 0.5s ease;
-    `;
-    
-    // إضافة تعريف الرسوم المتحركة للاهتزاز
-    const shakeAnimation = document.createElement('style');
-    shakeAnimation.textContent = `
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-    `;
-    document.head.appendChild(shakeAnimation);
-    
-    // إضافة النص
-    errorElement.textContent = message;
-    
-    // حذف أي رسائل خطأ سابقة
-    document.querySelectorAll('.validation-error').forEach(el => el.remove());
-    
-    // إضافة العنصر للنافذة
-    const modalBody = document.querySelector('#new-card-modal .modal-body');
-    if (modalBody) {
-        modalBody.insertBefore(errorElement, modalBody.firstChild);
-    }
-    
-    // إزالة الرسالة بعد 3 ثوانٍ
-    setTimeout(() => {
-        errorElement.style.opacity = '0';
-        errorElement.style.transition = 'opacity 0.5s';
-        setTimeout(() => {
-            errorElement.remove();
-        }, 500);
-    }, 3000);
-}
-
-// عرض إشعار نجاح
-function showSuccessNotification(message) {
-    showNotification(message, 'success');
-}
-
-// عرض إشعار خطأ
-function showErrorNotification(message) {
-    showNotification(message, 'error');
-}
-
-// عرض إشعار
-function showNotification(message, type = 'info') {
-    // الألوان حسب النوع
-    const colors = {
-        success: '#27ae60',
-        error: '#e74c3c',
-        info: '#3498db',
-        warning: '#f39c12'
-    };
-    const color = colors[type] || colors.info;
-    
-    // الأيقونة حسب النوع
-    const icons = {
-        success: 'check-circle',
-        error: 'exclamation-circle',
-        info: 'info-circle',
-        warning: 'exclamation-triangle'
-    };
-    const icon = icons[type] || icons.info;
-    
-    // إنشاء عنصر الإشعار
-    const notification = document.createElement('div');
-    notification.className = 'system-notification';
-    notification.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background-color: ${color};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 5px;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        z-index: 10000;
-        min-width: 300px;
-        transform: translateX(100%);
-        animation: slide-in 0.5s forwards;
-    `;
-    
-    // إضافة تعريف الرسوم المتحركة للدخول
-    const slideAnimation = document.createElement('style');
-    slideAnimation.textContent = `
-        @keyframes slide-in {
-            to { transform: translateX(0); }
-        }
-        @keyframes slide-out {
-            to { transform: translateX(100%); }
-        }
-    `;
-    document.head.appendChild(slideAnimation);
-    
-    // إضافة المحتوى
-    notification.innerHTML = `
-        <div style="font-size: 24px;">
-            <i class="fas fa-${icon}"></i>
-        </div>
-        <div style="flex: 1;">
-            ${message}
-        </div>
-        <button style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    // إضافة الإشعار للصفحة
-    document.body.appendChild(notification);
-    
-    // إضافة حدث إغلاق
-    notification.querySelector('button').addEventListener('click', () => {
-        notification.style.animation = 'slide-out 0.5s forwards';
-        setTimeout(() => {
-            notification.remove();
-        }, 500);
-    });
-    
-    // إغلاق تلقائي بعد 5 ثوانٍ
-    setTimeout(() => {
-        if (document.body.contains(notification)) {
-            notification.style.animation = 'slide-out 0.5s forwards';
-            setTimeout(() => {
-                notification.remove();
-            }, 500);
-        }
-    }, 5000);
-}
-
-// تعريف وظائف معالجة البطاقات
-function defineCardProcessingFunctions() {
-    // توليد معرف فريد
-    window.generateUniqueId = function() {
-        const timestamp = Date.now().toString(36);
-        const randomStr = Math.random().toString(36).substring(2, 10);
-        return `${timestamp}-${randomStr}`;
-    };
-    
-    // توليد رقم بطاقة
-    window.generateCardNumber = function(cardType) {
-        const prefixes = {
-            'platinum': '5555',
-            'gold': '4444',
-            'premium': '3333'
-        };
-        
-        const prefix = prefixes[cardType] || '3333';
-        
-        let number = prefix;
-        for (let i = 0; i < 12; i++) {
-            number += Math.floor(Math.random() * 10);
-        }
-        
-        // إضافة رقم تحقق (Luhn algorithm)
-        let sum = 0;
-        let isEven = false;
-        
-        for (let i = number.length - 1; i >= 0; i--) {
-            let digit = parseInt(number.charAt(i));
-            
-            if (isEven) {
-                digit *= 2;
-                if (digit > 9) {
-                    digit = digit - 9;
-                }
-            }
-            
-            sum += digit;
-            isEven = !isEven;
-        }
-        
-        const checkDigit = (10 - (sum % 10)) % 10;
-        return number + checkDigit;
-    };
-    
-    // الحصول على مزايا البطاقة
-    window.getCardFeaturesForType = function(cardType) {
-        switch (cardType) {
-            case 'platinum':
-                return {
-                    profitBonus: 0.25, // مكافأة أرباح إضافية 0.25%
-                    freeTransactions: -1, // معاملات مجانية غير محدودة
-                    prioritySupport: true,
-                    vipAccess: true,
-                    insurance: true
-                };
-            case 'gold':
-                return {
-                    profitBonus: 0.15, // مكافأة أرباح إضافية 0.15%
-                    freeTransactions: 50, // 50 معاملة مجانية شهرياً
-                    prioritySupport: true,
-                    vipAccess: false,
-                    insurance: true
-                };
-            case 'premium':
-            default:
-                return {
-                    profitBonus: 0, // بدون مكافأة إضافية
-                    freeTransactions: 20, // 20 معاملة مجانية شهرياً
-                    prioritySupport: false,
-                    vipAccess: false,
-                    insurance: false
-                };
-        }
-    };
-    
-    // حفظ البطاقات
-    window.saveCards = function(newCard) {
-        // حفظ في التخزين المحلي
-        localStorage.setItem('investorCards', JSON.stringify(window.investorCards));
-        
-        // محاولة الحفظ في Firebase
-        try {
-            if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-                // حفظ البطاقة الجديدة
-                firebase.database().ref(`investorCards/${newCard.id}`).set(newCard);
-                console.log("✅ تم حفظ البطاقة في Firebase");
-            }
-        } catch (error) {
-            console.error("❌ خطأ في حفظ البطاقة في Firebase:", error);
-        }
-        
-        // محاولة استخدام وظائف النظام القديم
-        if (typeof saveInvestorCards === 'function') {
-            try {
-                saveInvestorCards();
-            } catch (error) {
-                console.warn("⚠️ خطأ في استخدام وظيفة حفظ البطاقات القديمة:", error);
-            }
-        }
-        
-        // محاولة استخدام المزامنة مع Firebase القديمة
-        if (typeof syncCardToFirebase === 'function') {
-            try {
-                syncCardToFirebase(newCard);
-            } catch (error) {
-                console.warn("⚠️ خطأ في استخدام وظيفة مزامنة Firebase القديمة:", error);
-            }
-        }
-        
-        console.log("✅ تم حفظ البطاقات بنجاح");
-    };
-    
-    // تحديث واجهة المستخدم
-    window.updateUI = function() {
-        // محاولة استخدام وظائف النظام القديم
-        if (typeof updateCardsDisplay === 'function') {
-            try {
-                updateCardsDisplay();
-            } catch (error) {
-                console.warn("⚠️ خطأ في استخدام وظيفة تحديث العرض القديمة:", error);
-                // تطبيق تحديث بديل
-                applyAlternativeUIUpdate();
-            }
-        } else {
-            // تطبيق تحديث بديل
-            applyAlternativeUIUpdate();
-        }
-        
-        // تحديث الشارات
-        if (typeof updateCardsBadges === 'function') {
-            try {
-                updateCardsBadges();
-            } catch (error) {
-                console.warn("⚠️ خطأ في استخدام وظيفة تحديث الشارات القديمة:", error);
-            }
-        }
-        
-        console.log("✅ تم تحديث واجهة المستخدم");
-    };
-    
-    // تطبيق تحديث بديل لواجهة المستخدم
-    window.applyAlternativeUIUpdate = function() {
-        // البحث عن عنصر لعرض البطاقات
-        const cardsContainer = document.querySelector('#cardsGrid, .cards-container, .investor-cards');
-        
-        if (cardsContainer) {
-            // مسح المحتوى
-            cardsContainer.innerHTML = '';
-            
-            // عرض البطاقات
-            if (Array.isArray(window.investorCards) && window.investorCards.length > 0) {
-                window.investorCards.forEach(card => {
-                    // البحث عن المستثمر
-                    const investor = window.investors.find(inv => inv.id === card.investorId);
-                    if (!investor) return;
-                    
-                    // إنشاء عنصر البطاقة
-                    const cardElement = document.createElement('div');
-                    cardElement.className = `investor-card ${card.type} ${card.status === 'suspended' ? 'suspended' : ''}`;
-                    cardElement.style.cssText = `
-                        width: 350px;
-                        height: 220px;
-                        border-radius: 15px;
-                        position: relative;
-                        overflow: hidden;
-                        cursor: pointer;
-                        margin: 15px;
-                        background: ${getCardGradient(card.type)};
-                        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-                    `;
-                    
-                    // إضافة محتوى البطاقة
-                    cardElement.innerHTML = `
-                        <div class="card-content" style="position: relative; height: 100%; padding: 20px; color: white; z-index: 1;">
-                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                                <div class="card-logo" style="width: 60px; height: 35px; background: white; border-radius: 5px; padding: 5px; display: flex; align-items: center; justify-content: center;">
-                                    <div style="font-size: 12px; font-weight: bold; color: #333;">IIB</div>
-                                </div>
-                                
-                                <div class="card-type-icon" style="font-size: 24px; color: rgba(255,255,255,0.8);">
-                                    <i class="fas fa-${card.type === 'platinum' ? 'gem' : card.type === 'gold' ? 'crown' : 'star'}"></i>
-                                </div>
-                            </div>
-                            
-                            <div class="card-number" style="font-size: 20px; letter-spacing: 3px; margin-top: 60px; text-shadow: 0 1px 2px rgba(0,0,0,0.3); font-family: 'Courier New', monospace;">
-                                ${formatCardNumberForDisplay(card.number)}
-                            </div>
-                            
-                            <div class="card-details" style="position: absolute; bottom: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between;">
-                                <div class="card-holder">
-                                    <div class="card-label" style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-bottom: 5px;">CARD HOLDER</div>
-                                    <div class="card-value" style="font-size: 14px; font-weight: 600; letter-spacing: 1px;">${investor.name.toUpperCase()}</div>
-                                </div>
-                                
-                                <div class="card-expiry">
-                                    <div class="card-label" style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-bottom: 5px;">VALID THRU</div>
-                                    <div class="card-value" style="font-size: 14px; font-weight: 600; letter-spacing: 1px;">${formatExpiryForDisplay(card.expiry)}</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    
-                    // إضافة حدث النقر
-                    cardElement.onclick = function() {
-                        if (typeof viewCardDetails === 'function') {
-                            viewCardDetails(card.id);
-                        } else {
-                            alert(`بطاقة ${investor.name}: ${formatCardNumberForDisplay(card.number)}`);
-                        }
-                    };
-                    
-                    // إضافة البطاقة للحاوية
-                    cardsContainer.appendChild(cardElement);
-                });
-            } else {
-                // عرض رسالة "لا توجد بطاقات"
-                cardsContainer.innerHTML = `
-                    <div style="text-align: center; padding: 50px; width: 100%;">
-                        <i class="fas fa-credit-card fa-3x" style="color: #ccc; margin-bottom: 15px;"></i>
-                        <p style="color: #666;">لا توجد بطاقات</p>
-                        <button class="btn-primary new-add-card-button" style="margin-top: 15px; background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;">
-                            <i class="fas fa-plus"></i> إضافة بطاقة جديدة
-                        </button>
-                    </div>
-                `;
-                
-                // إضافة حدث النقر لزر الإضافة
-                cardsContainer.querySelector('.new-add-card-button').onclick = function() {
-                    openNewCardModal();
-                };
-            }
-        }
-    };
-    
-    console.log("✅ تم تعريف وظائف معالجة البطاقات");
-}
-
-// ============= القسم 3: دالة التنفيذ الرئيسية =============
-
-// دالة تنفيذ نظام الإصلاح الشامل
-function executeCardSystemRecovery() {
-    console.log("🔄 بدء تنفيذ نظام استعادة وإصلاح البطاقات الشامل...");
-    
-    // 1. استعادة البطاقات من جميع مصادر التخزين
-    recoverAllCards().then(recoveredCards => {
-        console.log(`✅ تم استرداد ${recoveredCards.length} بطاقة بنجاح`);
-        
-        // 2. إنشاء نظام إضافة البطاقات الجديد
-        createNewCardSystem();
-        
-        // 3. إضافة زر للتشخيص وإعادة الاسترداد
-        addDiagnosticButton();
-    }).catch(error => {
-        console.error("❌ حدث خطأ أثناء استعادة البطاقات:", error);
-        // إنشاء نظام إضافة البطاقات الجديد على أي حال
-        createNewCardSystem();
-    });
-}
-
-// إضافة زر للتشخيص وإعادة الاسترداد
-function addDiagnosticButton() {
-    // إنشاء الزر
-    const diagnosticBtn = document.createElement('button');
-    diagnosticBtn.className = 'diagnostic-btn';
-    diagnosticBtn.innerHTML = '<i class="fas fa-tools"></i>';
-    diagnosticBtn.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        background-color: #3498db;
-        color: white;
-        border: none;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        cursor: pointer;
-        z-index: 9999;
-        font-size: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s;
-    `;
-    
-    // إضافة حدث النقر
-    diagnosticBtn.onclick = function() {
-        // إنشاء قائمة الخيارات
-        const menu = document.createElement('div');
-        menu.className = 'diagnostic-menu';
-        menu.style.cssText = `
-            position: fixed;
-            bottom: 80px;
-            left: 20px;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            z-index: 9998;
-            overflow: hidden;
-        `;
-        
-        // إضافة خيارات القائمة
-        menu.innerHTML = `
-            <div class="menu-item" style="padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;">
-                <i class="fas fa-undo"></i> استعادة البطاقات
-            </div>
-            <div class="menu-item" style="padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;">
-                <i class="fas fa-sync"></i> تحديث العرض
-            </div>
-            <div class="menu-item" style="padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;">
-                <i class="fas fa-plus"></i> إضافة بطاقة
-            </div>
-            <div class="menu-item" style="padding: 10px 15px; cursor: pointer; transition: background-color 0.3s;">
-                <i class="fas fa-bug"></i> عرض المشاكل
-            </div>
-        `;
-        
-        // إضافة أحداث النقر للخيارات
-        menu.querySelectorAll('.menu-item').forEach((item, index) => {
-            // إضافة تأثير التحويم
-            item.addEventListener('mouseover', function() {
-                this.style.backgroundColor = '#f0f0f0';
-            });
-            
-            item.addEventListener('mouseout', function() {
-                this.style.backgroundColor = 'white';
-            });
-            
-            // إضافة حدث النقر
-            item.addEventListener('click', function() {
-                switch (index) {
-                    case 0: // استعادة البطاقات
-                        recoverAllCards();
-                        break;
-                    case 1: // تحديث العرض
-                        if (typeof updateUI === 'function') {
-                            updateUI();
-                        } else {
-                            applyAlternativeUIUpdate();
-                        }
-                        break;
-                    case 2: // إضافة بطاقة
-                        openNewCardModal();
-                        break;
-                    case 3: // عرض المشاكل
-                        showDiagnosticInfo();
-                        break;
-                }
-                
-                // إغلاق القائمة
-                menu.remove();
-            });
-        });
-        
-        // إضافة القائمة للصفحة
-        document.body.appendChild(menu);
-        
-        // إغلاق القائمة عند النقر خارجها
-        document.addEventListener('click', function closeMenu(e) {
-            if (!menu.contains(e.target) && e.target !== diagnosticBtn) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
-        });
-    };
-    
-    // إضافة الزر للصفحة
-    document.body.appendChild(diagnosticBtn);
-}
-
-// عرض معلومات التشخيص
-function showDiagnosticInfo() {
-    console.group("📊 معلومات تشخيص نظام البطاقات");
-    
-    // عرض حالة المصفوفات
-    console.log("مصفوفة البطاقات:", Array.isArray(window.investorCards) ? window.investorCards : "غير موجودة");
-    console.log("مصفوفة المستثمرين:", Array.isArray(window.investors) ? window.investors : "غير موجودة");
-    
-    // عرض حالة الوظائف الهامة
-    console.log("وظيفة updateCardsDisplay:", typeof updateCardsDisplay === 'function' ? "موجودة" : "غير موجودة");
-    console.log("وظيفة saveInvestorCards:", typeof saveInvestorCards === 'function' ? "موجودة" : "غير موجودة");
-    console.log("وظيفة syncCardToFirebase:", typeof syncCardToFirebase === 'function' ? "موجودة" : "غير موجودة");
-    
-    // عرض حالة Firebase
-    console.log("Firebase:", typeof firebase !== 'undefined' ? "موجود" : "غير موجود");
-    console.log("Firebase مهيأ:", typeof firebase !== 'undefined' && firebase.apps.length > 0 ? "نعم" : "لا");
-    
-    // عرض حالة عناصر DOM
-    console.log("حاوية البطاقات:", document.querySelector('#cardsGrid, .cards-container, .investor-cards') ? "موجودة" : "غير موجودة");
-    console.log("نافذة إنشاء البطاقة القديمة:", document.getElementById('createCardModal') ? "موجودة" : "غير موجودة");
-    console.log("نافذة إنشاء البطاقة الجديدة:", document.getElementById('new-card-modal') ? "موجودة" : "غير موجودة");
-    
-    console.groupEnd();
-    
-    // عرض إشعار للمستخدم
-    showNotification("تم عرض معلومات التشخيص في وحدة التحكم (F12)", 'info');
-}
-
-// تنفيذ نظام الاستعادة عند تحميل الصفحة
-document.addEventListener('DOMContentLoaded', executeCardSystemRecovery);
