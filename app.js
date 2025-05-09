@@ -1,6 +1,5 @@
 // Global Variables
 let investors = [];
-let investorCardSystem = null;
 let investments = [];
 let operations = [];
 let events = [];
@@ -527,62 +526,57 @@ function loadChart(chartId, data, config = {}) {
 function toggleSidebar() {
     document.querySelector('.sidebar').classList.toggle('active');
 }
+
 // Show specific page
 function showPage(pageId) {
-    // إخفاء جميع الصفحات
+    // Hide all pages
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
     });
     
-    // إزالة الفئة النشطة من جميع عناصر القائمة
+    // Show the selected page
+    document.getElementById(pageId).classList.add('active');
+    
+    // Mark the current menu item as active
     document.querySelectorAll('.menu-item').forEach(item => {
         item.classList.remove('active');
     });
     
-    // التحقق مما إذا كانت الصفحة المطلوبة من نظام البطاقات
-    const cardPages = ['investor-cards', 'active-cards', 'expired-cards', 'barcode-scanner', 'new-card', 'card-stats'];
+    document.querySelector(`.menu-item[href="#${pageId}"]`).classList.add('active');
     
-    if (cardPages.includes(pageId)) {
-        // إظهار الصفحة المطلوبة
-        const page = document.getElementById(pageId + '-page');
-        if (page) {
-            page.classList.add('active');
-            
-            // تحديث نظام البطاقات
-            switch (pageId) {
-                case 'investor-cards':
-                    InvestorCardSystem.renderCards('all');
-                    break;
-                case 'active-cards':
-                    InvestorCardSystem.renderCards('active');
-                    break;
-                case 'expired-cards':
-                    InvestorCardSystem.renderCards('expired');
-                    break;
-                case 'barcode-scanner':
-                    InvestorCardSystem.initBarcodeScanner();
-                    break;
-                case 'new-card':
-                    InvestorCardSystem.updateInvestorSelect();
-                    InvestorCardSystem.updateCardPreview();
-                    break;
-                case 'card-stats':
-                    InvestorCardSystem.renderCardStats();
-                    break;
-            }
-        }
-    } else {
-        // معالجة الصفحات العادية
-        const page = document.getElementById(pageId);
-        if (page) {
-            page.classList.add('active');
-        }
-    }
-    
-    // تطبيق الفئة النشطة على عنصر القائمة المطابق
-    const activeMenuItem = document.querySelector(`.menu-item[onclick="showPage('${pageId}')"]`);
-    if (activeMenuItem) {
-        activeMenuItem.classList.add('active');
+    // Update the page content if needed
+    switch (pageId) {
+        case 'dashboard':
+            updateDashboard();
+            break;
+        case 'investors':
+            loadInvestors();
+            break;
+        case 'investments':
+            loadInvestments();
+            break;
+        case 'profits':
+            loadProfits();
+            break;
+        case 'operations':
+            loadOperations();
+            break;
+        case 'reports':
+            populateReportInvestors();
+            loadReports();
+            break;
+        case 'financial':
+            loadFinancialData();
+            break;
+        case 'calendar':
+            loadCalendar();
+            break;
+        case 'settings':
+            loadSettings();
+            break;
+        case 'analytics':
+            loadAnalytics();
+            break;
     }
 }
 

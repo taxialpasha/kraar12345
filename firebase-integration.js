@@ -1,3 +1,8 @@
+
+
+
+
+
 /**
  * Firebase Integration
  * 
@@ -661,6 +666,11 @@ function setupFirebaseApp() {
             });
         }
     };
+    
+    // تهيئة Firebase
+    if (!window.firebaseApp) {
+        window.firebaseApp = firebase.initializeApp(firebaseConfig);
+    }
     
     // تهيئة Firebase
     window.firebaseApp.init();
@@ -2003,4 +2013,25 @@ function updateSyncStatus(status, type) {
     if (syncIcon) {
         syncIcon.className = `sync-btn ${type}`;
     }
+}
+
+// دعم مزامنة بطاقات المستثمرين
+window.syncInvestorCards = function() {
+    if (window.firebaseApp && window.firebaseApp.database && window.InvestorCardSystem) {
+        console.log("مزامنة بطاقات المستثمرين...");
+        
+        // التحقق من وجود الوظيفة
+        if (typeof window.InvestorCardSystem.syncInvestorCardsWithFirebase === 'function') {
+            window.InvestorCardSystem.syncInvestorCardsWithFirebase();
+        }
+    }
+};
+
+// إضافة مزامنة البطاقات إلى جدولة المزامنة
+if (window.scheduleSyncOperations) {
+    const originalSchedule = window.scheduleSyncOperations;
+    window.scheduleSyncOperations = function() {
+        originalSchedule();
+        window.syncInvestorCards();
+    };
 }

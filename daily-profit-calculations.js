@@ -16,22 +16,17 @@ function calculateProfitImproved(amount, startDate, endDate) {
     // احتساب عدد الأيام بين التاريخين
     const totalDays = daysDifference(startDate, endDate);
     
-    // الحصول على المعدل اليومي للربح
+    // الحصول على المعدل اليومي للربح - نستخدم 30 يوم كقيمة ثابتة للشهر كما في المثال
     const monthlyProfitRate = settings.monthlyProfitRate || 1.75; // النسبة الشهرية (الافتراضية 1.75%)
-    const dailyProfitRate = monthlyProfitRate / getDaysInMonth(start);
+    const standardDaysInMonth = 30; // استخدام 30 يوم كمعيار ثابت للشهر
+    const dailyProfitRate = monthlyProfitRate / standardDaysInMonth;
     
-    // حساب مجموع الأرباح لكل يوم بين التاريخين
-    let totalProfit = 0;
-    const currentDate = new Date(start);
+    // حساب الربح اليومي لكل 10 مليون
+    const dailyProfitPer10Million = 10000000 * (dailyProfitRate / 100); // هذا يعطي 5833.33333 لكل 10 مليون
     
-    while (currentDate <= end) {
-        // حساب الربح اليومي
-        const dailyProfit = (amount * dailyProfitRate) / 100;
-        totalProfit += dailyProfit;
-        
-        // الانتقال إلى اليوم التالي
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
+    // حساب مجموع الأرباح بناءً على عدد الأيام وقيمة الاستثمار
+    const profitRatio = amount / 10000000; // نسبة المبلغ إلى 10 مليون
+    const totalProfit = dailyProfitPer10Million * totalDays * profitRatio;
     
     return totalProfit;
 }
@@ -250,15 +245,25 @@ function displayProfitCalculationDetails(profitDetails) {
                 <div class="table-header">
                     <div class="table-title">تفاصيل حساب الأرباح</div>
                 </div>
+                <div class="alert alert-info">
+                    <div class="alert-icon">
+                        <i class="fas fa-info-circle"></i>
+                    </div>
+                    <div class="alert-content">
+                        <div class="alert-title">طريقة حساب الأرباح</div>
+                        <div class="alert-text">
+                            يتم حساب الربح اليومي بمعدل 5,833.33 لكل 10 مليون (${settings.monthlyProfitRate}% شهرياً) × عدد أيام الاستثمار
+                        </div>
+                    </div>
+                </div>
                 <table class="table">
                     <thead>
                         <tr>
                             <th>المبلغ</th>
-                            <th>تاريخ البداية</th>
-                            <th>تاريخ النهاية</th>
-                            <th>عدد الأيام النشطة</th>
-                            <th>النسبة المئوية</th>
-                            <th>الربح</th>
+                            <th>تاريخ الاستثمار</th>
+                            <th>عدد الأيام</th>
+                            <th>الربح اليومي</th>
+                            <th>إجمالي الربح</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -266,13 +271,20 @@ function displayProfitCalculationDetails(profitDetails) {
         
         // إضافة صفوف الجدول
         details.forEach(detail => {
+            // حساب الربح اليومي للمبلغ المستثمر
+            const standardDaysInMonth = 30;
+            const monthlyProfitRate = settings.monthlyProfitRate || 1.75;
+            const dailyProfitRate = monthlyProfitRate / standardDaysInMonth;
+            const dailyProfitPer10Million = 10000000 * (dailyProfitRate / 100);
+            const investmentRatio = detail.amount / 10000000;
+            const dailyProfit = dailyProfitPer10Million * investmentRatio;
+            
             html += `
                 <tr>
                     <td>${formatCurrency(detail.amount)}</td>
                     <td>${formatDate(detail.startDate)}</td>
-                    <td>${formatDate(detail.endDate)}</td>
-                    <td>${detail.activeDays} / ${detail.totalDays}</td>
-                    <td>${detail.activePercentage.toFixed(2)}%</td>
+                    <td>${detail.activeDays}</td>
+                    <td>${formatCurrency(dailyProfit.toFixed(2))}</td>
                     <td>${formatCurrency(detail.profit.toFixed(2))}</td>
                 </tr>
             `;
@@ -285,7 +297,7 @@ function displayProfitCalculationDetails(profitDetails) {
                     </tbody>
                     <tfoot>
                         <tr>
-                            <th colspan="5">المجموع</th>
+                            <th colspan="4">المجموع</th>
                             <th>${formatCurrency(totalProfit.toFixed(2))}</th>
                         </tr>
                     </tfoot>
