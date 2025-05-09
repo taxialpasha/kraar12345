@@ -9,7 +9,7 @@
     
     <!-- مكتبة QR Code -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 
     <link href="style.css" rel="stylesheet" />
 <link href="style.cssInvestor 55Card System CSSylesheet" />
@@ -2862,6 +2862,171 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
     </div>
+    
+    
+    <!-- Investor Cards Page -->
+<div id="investorCards" class="page">
+    <div class="header">
+        <h1 class="page-title">بطاقات المستثمرين</h1>
+        <div class="header-actions">
+            <div class="search-bar">
+                <input type="text" class="search-input" placeholder="بحث عن بطاقة..." oninput="searchInvestorCards()">
+                <i class="fas fa-search search-icon"></i>
+            </div>
+            <button class="btn btn-info" onclick="scanBarcode()">
+                <i class="fas fa-qrcode"></i> مسح بطاقة
+            </button>
+            <button class="btn btn-primary" onclick="openCreateCardModal()">
+                <i class="fas fa-plus"></i> إنشاء بطاقة
+            </button>
+            <div class="notification-btn" onclick="toggleNotificationPanel()">
+                <i class="fas fa-bell"></i>
+                <span class="notification-badge">0</span>
+            </div>
+            <div class="menu-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="cards-container">
+        <div class="cards-menu">
+            <div class="cards-menu-item active" onclick="switchCardsTab('all')">
+                <i class="fas fa-th-large"></i>
+                جميع البطاقات
+                <span class="cards-badge" id="allCardsBadge">0</span>
+            </div>
+            <div class="cards-menu-item" onclick="switchCardsTab('active')">
+                <i class="fas fa-check-circle"></i>
+                البطاقات النشطة
+                <span class="cards-badge" id="activeCardsBadge">0</span>
+            </div>
+            <div class="cards-menu-item" onclick="switchCardsTab('suspended')">
+                <i class="fas fa-pause-circle"></i>
+                البطاقات المتوقفة
+                <span class="cards-badge" id="suspendedCardsBadge">0</span>
+            </div>
+        </div>
+
+        <div class="cards-grid" id="cardsGrid">
+            <!-- Cards will be dynamically populated here -->
+        </div>
+    </div>
+</div>
+
+<!-- Create Card Modal -->
+<div class="modal-overlay" id="createCardModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 class="modal-title">إنشاء بطاقة جديدة</h2>
+            <div class="modal-close" onclick="closeModal('createCardModal')">
+                <i class="fas fa-times"></i>
+            </div>
+        </div>
+        <div class="modal-body card-modal-body">
+            <div class="card-form-container">
+                <form id="createCardForm">
+                    <div class="form-group">
+                        <label class="form-label">اسم المستثمر</label>
+                        <select class="form-select" id="cardInvestor" required onchange="updateCardPreview()">
+                            <option value="">اختر المستثمر</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">رقم الجوال</label>
+                        <input type="text" class="form-control" id="cardPhone" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">نوع البطاقة</label>
+                        <div class="card-type-options">
+                            <label class="card-type-option premium selected">
+                                <input type="radio" name="cardType" value="premium" checked onchange="updateCardPreview()">
+                                <div class="card-type-icon">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <div class="card-type-name">بريميوم</div>
+                                <div class="card-type-features">
+                                    • 20 معاملة مجانية شهرياً<br>
+                                    • حد يومي: 2,000,000 د.ع<br>
+                                    • تأمين أساسي
+                                </div>
+                            </label>
+                            
+                            <label class="card-type-option gold">
+                                <input type="radio" name="cardType" value="gold" onchange="updateCardPreview()">
+                                <div class="card-type-icon">
+                                    <i class="fas fa-crown"></i>
+                                </div>
+                                <div class="card-type-name">ذهبية</div>
+                                <div class="card-type-features">
+                                    • 50 معاملة مجانية شهرياً<br>
+                                    • حد يومي: 5,000,000 د.ع<br>
+                                    • مكافأة أرباح +0.15%<br>
+                                    • دعم ذو أولوية
+                                </div>
+                            </label>
+                            
+                            <label class="card-type-option platinum">
+                                <input type="radio" name="cardType" value="platinum" onchange="updateCardPreview()">
+                                <div class="card-type-icon">
+                                    <i class="fas fa-gem"></i>
+                                </div>
+                                <div class="card-type-name">بلاتينية</div>
+                                <div class="card-type-features">
+                                    • معاملات مجانية غير محدودة<br>
+                                    • حد يومي: 10,000,000 د.ع<br>
+                                    • مكافأة أرباح +0.25%<br>
+                                    • خدمات VIP حصرية
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">تاريخ الانتهاء</label>
+                        <input type="month" class="form-control" id="cardExpiry" required onchange="updateCardPreview()">
+                    </div>
+                </form>
+            </div>
+            <div class="card-preview-container">
+                <h3>معاينة البطاقة</h3>
+                <div class="card-preview" id="cardPreview">
+                    <!-- Card preview will be displayed here -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-light" onclick="closeModal('createCardModal')">إلغاء</button>
+            <button class="btn btn-primary" onclick="createInvestorCard()">
+                <i class="fas fa-plus"></i> إنشاء البطاقة
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Card Details Modal -->
+<div class="modal-overlay" id="cardDetailsModal">
+    <div class="modal" style="max-width: 1000px;">
+        <div class="modal-header">
+            <h2 class="modal-title">تفاصيل البطاقة</h2>
+            <div class="modal-close" onclick="closeModal('cardDetailsModal')">
+                <i class="fas fa-times"></i>
+            </div>
+        </div>
+        <div class="modal-body" id="cardDetailsContent">
+            <!-- Card details will be populated here -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-light" onclick="closeModal('cardDetailsModal')">إغلاق</button>
+            <button class="btn btn-warning" id="toggleCardStatusBtn" onclick="toggleCardStatus()">
+                <i class="fas fa-ban"></i> إيقاف البطاقة
+            </button>
+            <button class="btn btn-danger" onclick="deleteCard()">
+                <i class="fas fa-trash"></i> حذف البطاقة
+            </button>
+        </div>
+    </div>
+</div>
+    
     <script src="chart-utils.js"></script>
     <script src="app.js"></script>
     <script src="firebase-integration.js"></script>
