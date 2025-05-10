@@ -2035,3 +2035,136 @@ if (window.scheduleSyncOperations) {
         window.syncInvestorCards();
     };
 }
+
+
+
+// دالة جديدة لدمج البيانات بدلاً من استبدالها
+function mergeData(newData, existingData) {
+    // دمج المستثمرين
+    const mergedInvestors = [...existingData.investors];
+    newData.investors.forEach(newInvestor => {
+        const exists = mergedInvestors.find(inv => inv.id === newInvestor.id);
+        if (!exists) {
+            mergedInvestors.push(newInvestor);
+        } else {
+            // تحديث المستثمر الموجود بآخر نسخة
+            const index = mergedInvestors.findIndex(inv => inv.id === newInvestor.id);
+            mergedInvestors[index] = newInvestor;
+        }
+    });
+    
+    // دمج الاستثمارات
+    const mergedInvestments = [...existingData.investments];
+    newData.investments.forEach(newInvestment => {
+        const exists = mergedInvestments.find(inv => inv.id === newInvestment.id);
+        if (!exists) {
+            mergedInvestments.push(newInvestment);
+        } else {
+            // تحديث الاستثمار الموجود بآخر نسخة
+            const index = mergedInvestments.findIndex(inv => inv.id === newInvestment.id);
+            mergedInvestments[index] = newInvestment;
+        }
+    });
+    
+    // دمج العمليات
+    const mergedOperations = [...existingData.operations];
+    newData.operations.forEach(newOperation => {
+        const exists = mergedOperations.find(op => op.id === newOperation.id);
+        if (!exists) {
+            mergedOperations.push(newOperation);
+        } else {
+            // تحديث العملية الموجودة بآخر نسخة
+            const index = mergedOperations.findIndex(op => op.id === newOperation.id);
+            mergedOperations[index] = newOperation;
+        }
+    });
+    
+    // دمج الأحداث
+    const mergedEvents = [...existingData.events];
+    newData.events.forEach(newEvent => {
+        const exists = mergedEvents.find(ev => ev.id === newEvent.id);
+        if (!exists) {
+            mergedEvents.push(newEvent);
+        } else {
+            const index = mergedEvents.findIndex(ev => ev.id === newEvent.id);
+            mergedEvents[index] = newEvent;
+        }
+    });
+    
+    // دمج الإشعارات
+    const mergedNotifications = [...existingData.notifications];
+    newData.notifications.forEach(newNotification => {
+        const exists = mergedNotifications.find(notif => notif.id === newNotification.id);
+        if (!exists) {
+            mergedNotifications.push(newNotification);
+        } else {
+            const index = mergedNotifications.findIndex(notif => notif.id === newNotification.id);
+            mergedNotifications[index] = newNotification;
+        }
+    });
+    
+    return {
+        investors: mergedInvestors,
+        investments: mergedInvestments,
+        operations: mergedOperations,
+        events: mergedEvents,
+        notifications: mergedNotifications,
+        settings: {...existingData.settings, ...newData.settings}
+    };
+}
+
+// استعادة نسخة احتياطية من Firebase
+function restoreFirebaseBackup() {
+    const backupsListElement = document.getElementById('backupsList');
+    if (!backupsListElement || !backupsListElement.value) {
+        createNotification('خطأ', 'يرجى اختيار نسخة احتياطية', 'danger');
+        return;
+    }
+    
+    const backupId = backupsListElement.value;
+    
+    // البحث عن النسخة الاحتياطية
+    const backup = backupList.find(b => b.id === backupId);
+    
+    if (!backup) {
+        createNotification('خطأ', 'النسخة الاحتياطية غير موجودة', 'danger');
+        return;
+    }
+    
+    // تأكيد الاستعادة مع دمج البيانات
+    if (!confirm(`هل أنت متأكد من استعادة النسخة الاحتياطية "${backup.name}"؟ سيتم دمج البيانات مع البيانات الحالية.`)) {
+        return;
+    }
+    
+    // دمج البيانات مع البيانات الحالية
+    const currentData = {
+        investors: investors,
+        investments: investments,
+        operations: operations,
+        events: events,
+        notifications: notifications,
+        settings: settings
+    };
+    
+    const mergedData = mergeData(backup.data, currentData);
+    
+    // تحديث البيانات بالبيانات المدمجة
+    investors = mergedData.investors;
+    investments = mergedData.investments;
+    operations = mergedData.operations;
+    events = mergedData.events;
+    notifications = mergedData.notifications;
+    settings = mergedData.settings;
+    
+    // حفظ البيانات
+    saveData();
+    saveNotifications();
+    
+    // تحديث الواجهة
+    loadInvestors();
+    loadInvestments();
+    loadOperations();
+    
+    // إظهار رسالة نجاح
+    createNotification('نجاح', 'تم دمج النسخة الاحتياطية بنجاح', 'success');
+}

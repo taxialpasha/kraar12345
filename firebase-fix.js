@@ -330,3 +330,4 @@ window.createFirebaseBackup = function() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Firebase Fix cargado correctamente');
 });
+
